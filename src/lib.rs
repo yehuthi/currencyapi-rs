@@ -143,4 +143,36 @@ impl<const N: usize> LatestResponse<N> {
 			.position(|c| c == currency)
 			.map(|i| self.values[i])
 	}
+
+	/// Currency conversion.
+	///
+	/// Returns [`None`] if either currencies are missing.
+	pub fn convert(&self, from: CurrencyCode, to: CurrencyCode, amount: f64) -> Option<f64> {
+		let from_value = self.get(from)?;
+		let to_value = self.get(to)?;
+		Some(amount * (to_value / from_value))
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_convert() {
+		let usd = (*b"USD").try_into().unwrap();
+		let eur = (*b"EUR").try_into().unwrap();
+		let ils = (*b"ILS").try_into().unwrap();
+		let response = LatestResponse {
+			last_updated_at: Utc::now(),
+			currencies: SmallVec::from([usd, eur, ils]),
+			values: SmallVec::from([1.0, 0.9, 3.1]),
+			rate_limit: Default::default(),
+		};
+		assert_eq!(response.convert(usd, usd, 1234.0), Some(1234.));
+		assert_eq!(response.convert(eur, eur, 1234.0), Some(1234.));
+		assert_eq!(response.convert(ils, ils, 1234.0), Some(1234.));
+		assert_eq!(response.convert(ils, eur, 1.0), Some(1. / 3.1 * 0.9));
+		assert_eq!(response.convert(eur, ils, 1.0), Some(1. / 0.9 * 3.1));
+	}
 }
