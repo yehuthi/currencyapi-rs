@@ -1,12 +1,22 @@
 //! [Currency codes](CurrencyCode).
 
-use std::num::NonZeroU8;
+use std::{
+	fmt::{self, Display, Formatter},
+	num::NonZeroU8,
+};
 
 /// [Currency code](https://en.wikipedia.org/wiki/ISO_4217).
 #[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct CurrencyCode {
 	/// The code in uppercase alpha ASCII bytes.
 	code: [NonZeroU8; 3],
+}
+
+impl Display for CurrencyCode {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		let code: &str = self.as_ref();
+		code.fmt(f)
+	}
 }
 
 /// The default currency code is `USD`.
