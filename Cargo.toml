@@ -17,7 +17,8 @@ smallstr = { version = "0.3.0", features = ["serde", "union"] }
 smallvec = { version = "1.8.0", features = ["serde", "union", "const_generics", "const_new"] }
 
 [dev-dependencies]
+clap = { version = "3.1.7", features = ["derive"] }
 tokio = { version = "1.17.0", features = ["full"] }
 
 [[example]]
-name = "latest"
+name = "cli"
