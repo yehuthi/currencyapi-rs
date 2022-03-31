@@ -2,16 +2,30 @@
 
 use std::{
 	error::Error,
-	fmt::{self, Display, Formatter},
+	fmt::{self, Debug, Display, Formatter},
 	num::NonZeroU8,
 	str::FromStr,
 };
 
 /// [Currency code](https://en.wikipedia.org/wiki/ISO_4217).
-#[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct CurrencyCode {
 	/// The code in uppercase alpha ASCII bytes.
 	code: [NonZeroU8; 3],
+}
+
+impl Debug for CurrencyCode {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		let mut s = f.debug_struct("CurrencyCode");
+		let code: &[NonZeroU8; 3] = &self.code;
+		let code: &[u8; 3] = unsafe { std::mem::transmute(code) };
+		if let Ok(code) = std::str::from_utf8(code) {
+			s.field("code", &code);
+		} else {
+			s.field("code", &self.code);
+		}
+		s.finish()
+	}
 }
 
 /// The default currency code is `USD`.
@@ -133,7 +147,7 @@ impl AsRef<str> for CurrencyCode {
 impl Display for CurrencyCode {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		let code: &str = self.as_ref();
-		code.fmt(f)
+		Display::fmt(&code, f)
 	}
 }
 
@@ -145,7 +159,7 @@ pub struct InvalidCurrencyCodeError;
 
 impl Display for InvalidCurrencyCodeError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		"invalid currency code".fmt(f)
+		Display::fmt("invalid currency code", f)
 	}
 }
 
