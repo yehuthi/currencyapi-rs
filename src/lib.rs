@@ -134,4 +134,13 @@ impl<const N: usize> LatestResponse<N> {
 	pub fn iter(&self) -> impl Iterator<Item = (CurrencyCode, f64)> + '_ {
 		std::iter::zip(self.currencies.iter().copied(), self.values.iter().copied())
 	}
+
+	/// Gets the value for the given currency.
+	pub fn get(&self, currency: CurrencyCode) -> Option<f64> {
+		self.currencies
+			.iter()
+			.copied()
+			.position(|c| c == currency)
+			.map(|i| self.values[i])
+	}
 }
