@@ -94,7 +94,12 @@ impl FromStr for CurrencyCode {
 	type Err = InvalidCurrencyCodeError;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		s.try_into()
+		let b = s.as_bytes();
+		let mut b: [u8; 3] = b.try_into().map_err(|_| InvalidCurrencyCodeError)?;
+		for char in &mut b {
+			char.make_ascii_uppercase();
+		}
+		b.try_into()
 	}
 }
 
@@ -145,3 +150,21 @@ impl Display for InvalidCurrencyCodeError {
 }
 
 impl Error for InvalidCurrencyCodeError {}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_parse() {
+		assert_eq!(
+			"USD".parse::<CurrencyCode>(),
+			Ok(unsafe { CurrencyCode::from_bytes_unchecked(*b"USD") })
+		);
+	}
+
+	#[test]
+	fn test_parse_case_insensitive() {
+		assert_eq!("usd".parse::<CurrencyCode>(), "USD".parse::<CurrencyCode>());
+	}
+}
