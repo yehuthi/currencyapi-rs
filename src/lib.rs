@@ -86,10 +86,14 @@ impl Latest {
 /// [Rate-limit data](https://currencyapi.com/docs/#rate-limit-and-quotas) from response headers.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct RateLimit {
-	limit_minute: usize,
-	limit_month: usize,
-	remainig_minute: usize,
-	remaining_month: usize,
+	/// How many requests can be made in a minute.
+	pub limit_minute: usize,
+	/// How many requests can be made in a month.
+	pub limit_month: usize,
+	/// How many remaning requests be made in the minute of request.
+	pub remainig_minute: usize,
+	/// How many remaning requests be made in the month of request.
+	pub remaining_month: usize,
 }
 
 impl TryFrom<&reqwest::Response> for RateLimit {
