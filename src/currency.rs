@@ -1,6 +1,7 @@
 //! [Currency codes](CurrencyCode).
 
 use std::{
+	error::Error,
 	fmt::{self, Display, Formatter},
 	num::NonZeroU8,
 };
@@ -10,13 +11,6 @@ use std::{
 pub struct CurrencyCode {
 	/// The code in uppercase alpha ASCII bytes.
 	code: [NonZeroU8; 3],
-}
-
-impl Display for CurrencyCode {
-	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		let code: &str = self.as_ref();
-		code.fmt(f)
-	}
 }
 
 /// The default currency code is `USD`.
@@ -51,12 +45,6 @@ impl CurrencyCode {
 		}
 	}
 }
-
-/// Invalid currency code error.
-///
-/// Valid currency codes are three uppercase alpha ASCII characters.
-#[derive(Debug, Hash, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
-pub struct InvalidCurrencyCodeError;
 
 impl TryFrom<[NonZeroU8; 3]> for CurrencyCode {
 	type Error = InvalidCurrencyCodeError;
@@ -117,6 +105,7 @@ impl AsRef<[u8]> for CurrencyCode {
 		code
 	}
 }
+
 impl AsRef<str> for CurrencyCode {
 	fn as_ref(&self) -> &str {
 		unsafe {
@@ -126,3 +115,24 @@ impl AsRef<str> for CurrencyCode {
 		}
 	}
 }
+
+impl Display for CurrencyCode {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		let code: &str = self.as_ref();
+		code.fmt(f)
+	}
+}
+
+/// Invalid currency code error.
+///
+/// Valid currency codes are three uppercase alpha ASCII characters.
+#[derive(Debug, Hash, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+pub struct InvalidCurrencyCodeError;
+
+impl Display for InvalidCurrencyCodeError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		"invalid currency code".fmt(f)
+	}
+}
+
+impl Error for InvalidCurrencyCodeError {}
