@@ -4,6 +4,7 @@ use std::{
 	error::Error,
 	fmt::{self, Display, Formatter},
 	num::NonZeroU8,
+	str::FromStr,
 };
 
 /// [Currency code](https://en.wikipedia.org/wiki/ISO_4217).
@@ -86,6 +87,14 @@ impl<'a> TryFrom<&'a str> for CurrencyCode {
 
 	fn try_from(value: &'a str) -> Result<Self, Self::Error> {
 		Self::try_from(value.as_bytes())
+	}
+}
+
+impl FromStr for CurrencyCode {
+	type Err = InvalidCurrencyCodeError;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		s.try_into()
 	}
 }
 
