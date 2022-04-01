@@ -3,6 +3,7 @@ name = "currencyapi"
 version = "0.1.0"
 description = "currencyapi API"
 authors = ["Yehuthith <yehuthith@gmail.com>"]
+repository = "https://github.com/yehuthi/currencyapi-rs"
 license = "MIT OR Apache-2.0"
 categories = ["api-bindings"]
 keywords = ["currency", "convert", "freecurrencyapi", "money", "api"]
