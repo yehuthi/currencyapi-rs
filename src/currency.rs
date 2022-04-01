@@ -165,6 +165,34 @@ impl Display for InvalidCurrencyCodeError {
 
 impl Error for InvalidCurrencyCodeError {}
 
+pub mod list {
+	//! A list of currencies.
+
+	/// Defines const [`super::CurrencyCode`]s.
+	///
+	/// # Safety
+	/// Ensure all arguments consist of only uppercase alpha characters.
+	macro_rules! unsafe_define_currencies {
+		($($currency:ident),*) => (
+			$(
+				#[doc=concat!("The [", stringify!($currency), "](https://www.google.com/search?q=USD+to+", stringify!($currency), ") currency code.")]
+				pub const $currency: crate::currency::CurrencyCode = unsafe { crate::currency::CurrencyCode::from_bytes_unchecked(*bstringify::bstringify!($currency)) };
+			)*
+		);
+	}
+
+	unsafe_define_currencies!(
+		AED, AFN, ALL, AMD, AOA, ARS, AUD, AZN, BDT, BGN, BHD, BIF, BIH, BND, BOB, BRL, BSD, BTC,
+		BWP, BYR, CAD, CDF, CHF, CLP, CNY, COP, CRC, CUC, CVE, CZK, DJF, DKK, DOP, DZD, EGP, ERN,
+		ETB, ETH, EUR, FJD, GBP, GEL, GHS, GMD, GNF, GTQ, GYD, HKD, HNL, HRV, HTG, HUF, IDR, ILS,
+		INR, IQD, IRR, ISK, JMD, JOD, JPY, KES, KGS, KHR, KMF, KRW, KYD, KZT, LAK, LBP, LKR, LRD,
+		LSL, LTC, LYD, MAD, MDL, MGA, MKD, MMK, MNT, MOP, MUR, MVR, MWK, MXN, MYR, MZN, NAD, NGN,
+		NIO, NOK, NPR, NZD, OMR, PAB, PEN, PGK, PHP, PKR, PLN, PYG, QAR, RON, RSD, RUB, RWF, SAR,
+		SCR, SDG, SEK, SGD, SLL, SOS, SRD, SSP, STD, SVC, SYP, SZL, THB, TJS, TMT, TND, TRY, TTD,
+		TWD, TZS, UAH, UGX, URY, USD, UZS, VND, XAF, XOF, XPF, XRP, YER, ZAR
+	);
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
