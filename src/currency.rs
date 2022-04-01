@@ -8,6 +8,8 @@ use std::{
 };
 
 /// [Currency code](https://en.wikipedia.org/wiki/ISO_4217).
+///
+/// It's recommended to use the constants in the [`currency::list`](list) module.
 #[derive(Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct CurrencyCode {
 	/// The code in uppercase alpha ASCII bytes.
