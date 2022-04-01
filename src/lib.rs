@@ -16,7 +16,7 @@ pub mod currency;
 pub struct Latest(SmallString<[u8; 256]>);
 
 impl Latest {
-	/// Creates a new [`latest`] endpoint request.
+	/// Creates a new `latest` endpoint request.
 	///
 	/// Takes the [API key](https://currencyapi.com/docs/#authentication-api-key-information) token,
 	/// the [`base_currency`](https://currencyapi.com/docs/latest#:~:text=Your%20API%20Key-,base_currency,-string), and
