@@ -2,6 +2,8 @@
 
 #![deny(missing_docs)]
 
+use std::fmt::{self, Display, Formatter};
+
 use atoi::atoi;
 use chrono::{DateTime, Utc};
 use currency::CurrencyCode;
@@ -49,29 +51,45 @@ impl Latest {
 	pub async fn send<const N: usize>(
 		&self,
 		client: &reqwest::Client,
-	) -> reqwest::Result<LatestResponse<N>> {
-		let response = client
-			.get(self.0.as_str())
-			.send()
-			.await?
-			.error_for_status()?;
-		let rate_limit = (&response).try_into().unwrap();
+	) -> Result<LatestResponse<N>, Error> {
+		let response = client.get(self.0.as_str()).send().await?;
+
+		if response.status() == 429 {
+			return Err(Error::RateLimitError);
+		}
+
+		let response = response.error_for_status()?;
+		let rate_limit = (&response)
+			.try_into()
+			.map_err(|_| Error::RateLimitParseError)?;
 		let payload = response.json::<json::Value>().await?;
 		let last_updated_at = payload
 			.get("meta")
-			.unwrap()
-			.get("last_updated_at")
-			.unwrap()
-			.as_str()
-			.unwrap()
-			.parse()
-			.unwrap();
+			.and_then(|meta| meta.get("last_updated_at"))
+			.and_then(|last_updated_at| last_updated_at.as_str())
+			.ok_or(Error::ResponseParseError)
+			.and_then(|last_updated_at| {
+				last_updated_at
+					.parse()
+					.map_err(|_| Error::ResponseParseError)
+			})?;
 		let mut currencies = SmallVec::new();
 		let mut values = SmallVec::new();
 
-		for (currency, value_object) in payload.get("data").unwrap().as_object().unwrap() {
-			currencies.push(CurrencyCode::try_from(currency.as_str()).unwrap());
-			values.push(value_object.get("value").unwrap().as_f64().unwrap());
+		let data = payload
+			.get("data")
+			.and_then(|data| data.as_object())
+			.ok_or(Error::ResponseParseError)?;
+		for (currency, value_object) in data {
+			currencies.push(
+				CurrencyCode::try_from(currency.as_str()).map_err(|_| Error::ResponseParseError)?,
+			);
+			values.push(
+				value_object
+					.get("value")
+					.and_then(|value| value.as_f64())
+					.ok_or(Error::ResponseParseError)?,
+			);
 		}
 
 		Ok(LatestResponse {
@@ -82,6 +100,40 @@ impl Latest {
 		})
 	}
 }
+
+/// An error from the API or from the HTTP client.
+#[derive(Debug)]
+pub enum Error {
+	/// The rate-limit was hit.
+	RateLimitError,
+	/// HTTP error.
+	HttpError(reqwest::Error),
+	/// Failed to parse the response.
+	ResponseParseError,
+	/// Failed to parse the rate-limit headers.
+	RateLimitParseError,
+}
+
+impl From<reqwest::Error> for Error {
+	fn from(error: reqwest::Error) -> Self {
+		Self::HttpError(error)
+	}
+}
+
+impl Display for Error {
+	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+		match self {
+			Error::RateLimitError => "you have hit your rate limit or your monthly limit".fmt(f),
+			Error::HttpError(e) => write!(f, "HTTP error: {e}"),
+			Error::ResponseParseError => "failed to parse the response".fmt(f),
+			Error::RateLimitParseError => {
+				"failed to parse the rate-limits headers from the response".fmt(f)
+			}
+		}
+	}
+}
+
+impl std::error::Error for Error {}
 
 /// [Rate-limit data](https://currencyapi.com/docs/#rate-limit-and-quotas) from response headers.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
