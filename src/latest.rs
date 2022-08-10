@@ -14,11 +14,6 @@ use smallvec::SmallVec;
 pub struct Latest(SmallString<[u8; 256]>);
 
 impl Latest {
-	/// TODO
-	pub const fn buffer_size(currencies_len: usize) -> usize {
-		111 + currencies_len * 3 + currencies_len
-	}
-
 	/// Creates a new `latest` endpoint request.
 	///
 	/// Takes the [API key](https://currencyapi.com/docs/#authentication-api-key-information) token,
