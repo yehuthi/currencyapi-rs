@@ -183,15 +183,23 @@ pub mod list {
 		);
 	}
 
+	// Currencies are documented here: https://currencyapi.com/docs/currency-list
+	// To update this list, open dev-tools on the page, evaluate
+	// ```js
+	// [...document.querySelectorAll("td:first-child")].map(td => td.textContent).join()
+	// ```
+	// right click on the result, select "Copy string contents", and paste below between the parentheses.
 	unsafe_define_currencies!(
-		AED, AFN, ALL, AMD, AOA, ARS, AUD, AZN, BDT, BGN, BHD, BIF, BIH, BND, BOB, BRL, BSD, BTC,
-		BWP, BYR, CAD, CDF, CHF, CLP, CNY, COP, CRC, CUC, CVE, CZK, DJF, DKK, DOP, DZD, EGP, ERN,
-		ETB, ETH, EUR, FJD, GBP, GEL, GHS, GMD, GNF, GTQ, GYD, HKD, HNL, HRV, HTG, HUF, IDR, ILS,
-		INR, IQD, IRR, ISK, JMD, JOD, JPY, KES, KGS, KHR, KMF, KRW, KYD, KZT, LAK, LBP, LKR, LRD,
-		LSL, LTC, LYD, MAD, MDL, MGA, MKD, MMK, MNT, MOP, MUR, MVR, MWK, MXN, MYR, MZN, NAD, NGN,
-		NIO, NOK, NPR, NZD, OMR, PAB, PEN, PGK, PHP, PKR, PLN, PYG, QAR, RON, RSD, RUB, RWF, SAR,
-		SCR, SDG, SEK, SGD, SLL, SOS, SRD, SSP, STD, SVC, SYP, SZL, THB, TJS, TMT, TND, TRY, TTD,
-		TWD, TZS, UAH, UGX, URY, USD, UZS, VND, XAF, XOF, XPF, XRP, YER, ZAR
+		AED, AFN, ALL, AMD, ANG, AOA, ARS, AUD, AWG, AZN, BAM, BBD, BDT, BGN, BHD, BIF, BIH, BMD,
+		BND, BOB, BRL, BSD, BTC, BTN, BWP, BYN, BYR, BZD, CAD, CDF, CHF, CLF, CLP, CNY, COP, CRC,
+		CUC, CUP, CVE, CZK, DJF, DKK, DOP, DZD, EGP, ERN, ETB, ETH, EUR, FJD, FKP, GBP, GEL, GGP,
+		GHS, GIP, GMD, GNF, GTQ, GYD, HKD, HNL, HRK, HRV, HTG, HUF, IDR, ILS, IMP, INR, IQD, IRR,
+		ISK, JEP, JMD, JOD, JPY, KES, KGS, KHR, KMF, KPW, KRW, KWD, KYD, KZT, LAK, LBP, LKR, LRD,
+		LSL, LTC, LTL, LVL, LYD, MAD, MDL, MGA, MKD, MMK, MNT, MOP, MRO, MUR, MVR, MWK, MXN, MYR,
+		MZN, NAD, NGN, NIO, NOK, NPR, NZD, OMR, PAB, PEN, PGK, PHP, PKR, PLN, PYG, QAR, RON, RSD,
+		RUB, RWF, SAR, SBD, SCR, SDG, SEK, SGD, SHP, SLL, SOS, SRD, SSP, STD, SVC, SYP, SZL, THB,
+		TJS, TMT, TND, TOP, TRY, TTD, TWD, TZS, UAH, UGX, URY, USD, UYU, UZS, VEF, VND, VUV, WST,
+		XAF, XAG, XAU, XCD, XDR, XOF, XPF, XRP, YER, ZAR, ZMK, ZWL
 	);
 }
 
