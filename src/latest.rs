@@ -169,7 +169,7 @@ impl<'a, const N: usize, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, 
 	}
 }
 
-/// [`latest` endpoint](Latest) response data.
+/// [`latest` endpoint](Request) response data.
 #[derive(Debug, Clone)]
 pub struct LatestResponse<const N: usize> {
 	/// Datetime to let you know then this dataset was last updated. ― [Latest endpoint docs](https://currencyapi.com/docs/latest#:~:text=datetime%20to%20let%20you%20know%20then%20this%20dataset%20was%20last%20updated).
