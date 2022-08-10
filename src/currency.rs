@@ -181,8 +181,9 @@ pub mod list {
 				pub const $currency: crate::currency::CurrencyCode = unsafe { crate::currency::CurrencyCode::from_bytes_unchecked(*bstringify::bstringify!($currency)) };
 			)*
 			/// The length of all currencies defined in this module.
-			#[allow(path_statements)]
-			pub const LEN: usize = 0 $(+ { stringify!($currency); 1} )*;
+			const LEN: usize = 0 $(+ { stringify!($currency); 1} )*;
+			/// An array of all the currencies defined in this module.
+			pub const ARRAY: [crate::currency::CurrencyCode; LEN] = [ $( $currency ),* ];
 		};
 	}
 

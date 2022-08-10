@@ -45,7 +45,7 @@ impl<'a, const N: usize, T> Builder<'a, N, T> {
 	}
 }
 
-impl<'a> Builder<'a, { currency::list::LEN }, AllCurrencies> {
+impl<'a> Builder<'a, { currency::list::ARRAY.len() }, AllCurrencies> {
 	/// Creates a new [`Builder`] with the given [API token](Builder::token).
 	pub const fn new(token: &'a str) -> Self {
 		Builder {
@@ -56,7 +56,7 @@ impl<'a> Builder<'a, { currency::list::LEN }, AllCurrencies> {
 	}
 }
 
-impl<'a> From<&'a str> for Builder<'a, { currency::list::LEN }, AllCurrencies> {
+impl<'a> From<&'a str> for Builder<'a, { currency::list::ARRAY.len() }, AllCurrencies> {
 	fn from(token: &'a str) -> Self {
 		Self::new(token)
 	}

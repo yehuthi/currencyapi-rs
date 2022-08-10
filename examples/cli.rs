@@ -38,7 +38,7 @@ async fn main() {
 			request.base_currency(base);
 			let request = request.build();
 			let response = request
-				.send::<{ currency::list::LEN }>(&client)
+				.send::<{ currency::list::ARRAY.len() }>(&client)
 				.await
 				.unwrap();
 			for (currency, value) in response.iter() {
