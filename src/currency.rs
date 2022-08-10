@@ -175,12 +175,15 @@ pub mod list {
 	/// # Safety
 	/// Ensure all arguments consist of only uppercase alpha characters.
 	macro_rules! unsafe_define_currencies {
-		($($currency:ident),*) => (
+		($($currency:ident),*) => {
 			$(
 				#[doc=concat!("The [", stringify!($currency), "](https://www.google.com/search?q=USD+to+", stringify!($currency), ") currency code.")]
 				pub const $currency: crate::currency::CurrencyCode = unsafe { crate::currency::CurrencyCode::from_bytes_unchecked(*bstringify::bstringify!($currency)) };
 			)*
-		);
+			/// The length of all currencies defined in this module.
+			#[allow(path_statements)]
+			pub const LEN: usize = 0 $(+ { stringify!($currency); 1} )*;
+		};
 	}
 
 	// Currencies are documented here: https://currencyapi.com/docs/currency-list
