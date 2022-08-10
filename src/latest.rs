@@ -1,27 +1,82 @@
 //! API for the [`latest`](https://currencyapi.com/docs/latest) endpoint.
 
-use std::fmt::{self, Display, Formatter};
-
-use crate::currency::CurrencyCode;
 use atoi::atoi;
 use chrono::{DateTime, Utc};
 use serde_json as json;
 use smallstr::SmallString;
 use smallvec::SmallVec;
 
-/// [`latest`](https://currencyapi.com/docs/latest) endpoint.
-///
-/// # Type-Parameter `N`
-/// The type-parameter `N` denotes buffer size which depends on how many currencies are going to be requested.
-/// When you make a [`Latest::new`] instance, if you are going to use specify an X amount of `currencies`, then `N` should be `buffer_size(Y)` where Y >= X.
-///
-/// > **Note**
-/// >
-/// > Make sure to wrap the [`buffer_size`] call in curly-braces to avoid synax errors, e.g. `Latest<{buffer_size(20)}>`.
-#[derive(Debug, Hash, Clone)]
-pub struct Latest<const N: usize = { buffer_size(4) }>(SmallString<[u8; N]>);
+use crate::currency::{self, CurrencyCode};
 
-/// Calculates the buffer size for the [`Latest`] `N` type-parameter.
+/// A [`Builder`] buffer for all currencies.
+pub type AllCurrencies = std::iter::Empty<CurrencyCode>;
+
+/// [`Request`] builder.
+///
+/// # Examples
+/// ```
+/// # use currencyapi::latest::Builder;
+/// Builder::from("…").build();
+/// ```
+#[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+pub struct Builder<'a, const N: usize, T = AllCurrencies> {
+	/// The [API token](https://currencyapi.com/docs/#authentication-api-key-information).
+	pub token: &'a str,
+	/// The [`base_currency`](https://currencyapi.com/docs/latest#:~:text=Your%20API%20Key-,base_currency,-string).
+	pub base_currency: Option<CurrencyCode>,
+	/// The [`currencies`](https://currencyapi.com/docs/latest#:~:text=based%20on%20USD-,currencies,-string).
+	pub currencies: T,
+}
+
+impl<'a, const N: usize, T> Builder<'a, N, T> {
+	/// Sets the [`currencies`](Builder::currencies).
+	pub fn currencies<const N2: usize, T2>(self, currencies: T2) -> Builder<'a, N2, T2> {
+		Builder {
+			token: self.token,
+			base_currency: self.base_currency,
+			currencies,
+		}
+	}
+
+	/// Sets the [`base_currency`](Builder::base_currency).
+	pub fn base_currency(&mut self, base_currency: Option<CurrencyCode>) -> &mut Self {
+		self.base_currency = base_currency;
+		self
+	}
+}
+
+impl<'a> Builder<'a, { currency::list::LEN }, AllCurrencies> {
+	/// Creates a new [`Builder`] with the given [API token](Builder::token).
+	pub const fn new(token: &'a str) -> Self {
+		Builder {
+			token,
+			base_currency: None,
+			currencies: std::iter::empty(),
+		}
+	}
+}
+
+impl<'a> From<&'a str> for Builder<'a, { currency::list::LEN }, AllCurrencies> {
+	fn from(token: &'a str) -> Self {
+		Self::new(token)
+	}
+}
+
+impl<'a, const N: usize, T: IntoIterator<Item = CurrencyCode>> Builder<'a, N, T> {
+	/// Builds the [`Request`].
+	pub fn build(self) -> Request<N> {
+		self.into()
+	}
+}
+
+/// Calculates the [`Builder`] buffer size.
+///
+/// # Examples
+/// ```
+/// # use currencyapi::latest::{Builder, buffer_size};
+/// # use currencyapi::currency;
+/// Builder::from("…").currencies::<{ buffer_size(2) },_>([currency::list::USD, currency::list::EUR]);
+/// ```
 pub const fn buffer_size(currencies_len: usize) -> usize {
 	"https://api.currencyapi.com/v3/latest?apikey=".len()
 		+ /* API key length */ 36 + "&base_currency=XXX&currencies=".len()
@@ -29,38 +84,11 @@ pub const fn buffer_size(currencies_len: usize) -> usize {
 		+ /* Comma-separators */ currencies_len.saturating_sub(1)
 }
 
-impl<const N: usize> Latest<N> {
-	/// Creates a new `latest` endpoint request.
-	///
-	/// Takes the [API key](https://currencyapi.com/docs/#authentication-api-key-information) token,
-	/// the [`base_currency`](https://currencyapi.com/docs/latest#:~:text=Your%20API%20Key-,base_currency,-string), and
-	/// the [`currencies`](https://currencyapi.com/docs/latest#:~:text=based%20on%20USD-,currencies,-string) parameters.
-	///
-	/// If you are going to use the `currencies` parameter, make sure to see the documentation for the `N` type-parameter in [`Latest`].
-	pub fn new(
-		token: &str,
-		base_currency: Option<CurrencyCode>,
-		mut currencies: impl Iterator<Item = CurrencyCode>,
-	) -> Self {
-		let mut url = SmallString::from("https://api.currencyapi.com/v3/latest?apikey=");
-		url.push_str(token);
-		if let Some(base_currency) = base_currency {
-			url.push_str("&base_currency=");
-			url.push_str(base_currency.as_ref());
-		}
+/// The [`latest`](https://currencyapi.com/docs/latest) endpoint.
+#[derive(Debug, Hash, Clone)]
+pub struct Request<const N: usize>(SmallString<[u8; N]>);
 
-		if let Some(currencies_head) = currencies.next() {
-			url.push_str("&currencies=");
-			url.push_str(currencies_head.as_ref());
-			for currency in currencies {
-				url.push_str(",");
-				url.push_str(currency.as_ref());
-			}
-		}
-
-		Self(url)
-	}
-
+impl<const N: usize> Request<N> {
 	/// Sends the request.
 	pub async fn send<const M: usize>(
 		&self,
@@ -115,70 +143,29 @@ impl<const N: usize> Latest<N> {
 	}
 }
 
-/// An error from the API or from the HTTP client.
-#[derive(Debug)]
-pub enum Error {
-	/// The rate-limit was hit.
-	RateLimitError,
-	/// HTTP error.
-	HttpError(reqwest::Error),
-	/// Failed to parse the response.
-	ResponseParseError,
-	/// Failed to parse the rate-limit headers.
-	RateLimitParseError,
-}
+impl<'a, const N: usize, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, N, T>>
+	for Request<N>
+{
+	fn from(builder: Builder<'a, N, T>) -> Self {
+		let mut url = SmallString::with_capacity(N);
+		url.push_str("https://api.currencyapi.com/v3/latest?apikey=");
+		url.push_str(builder.token);
+		if let Some(base_currency) = builder.base_currency {
+			url.push_str("&base_currency=");
+			url.push_str(base_currency.as_ref());
+		}
 
-impl From<reqwest::Error> for Error {
-	fn from(error: reqwest::Error) -> Self {
-		Self::HttpError(error)
-	}
-}
-
-impl Display for Error {
-	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		match self {
-			Error::RateLimitError => "you have hit your rate limit or your monthly limit".fmt(f),
-			Error::HttpError(e) => write!(f, "HTTP error: {e}"),
-			Error::ResponseParseError => "failed to parse the response".fmt(f),
-			Error::RateLimitParseError => {
-				"failed to parse the rate-limits headers from the response".fmt(f)
+		let mut currencies = builder.currencies.into_iter();
+		if let Some(currencies_head) = currencies.next() {
+			url.push_str("&currencies=");
+			url.push_str(currencies_head.as_ref());
+			for currency in currencies {
+				url.push_str(",");
+				url.push_str(currency.as_ref());
 			}
 		}
-	}
-}
 
-impl std::error::Error for Error {}
-
-/// [Rate-limit data](https://currencyapi.com/docs/#rate-limit-and-quotas) from response headers.
-#[derive(Debug, Hash, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
-pub struct RateLimit {
-	/// How many requests can be made in a minute.
-	pub limit_minute: usize,
-	/// How many requests can be made in a month.
-	pub limit_month: usize,
-	/// How many remaning requests be made in the minute of request.
-	pub remainig_minute: usize,
-	/// How many remaning requests be made in the month of request.
-	pub remaining_month: usize,
-}
-
-impl TryFrom<&reqwest::Response> for RateLimit {
-	type Error = ();
-
-	fn try_from(value: &reqwest::Response) -> Result<Self, Self::Error> {
-		let headers = value.headers();
-		let h = |name| {
-			headers
-				.get(name)
-				.ok_or(())
-				.and_then(|value| atoi(value.as_bytes()).ok_or(()))
-		};
-		Ok(Self {
-			limit_minute: h("X-RateLimit-Limit-Quota-Minute")?,
-			limit_month: h("X-RateLimit-Limit-Quota-Month")?,
-			remainig_minute: h("X-RateLimit-Remaining-Quota-Minute")?,
-			remaining_month: h("X-RateLimit-Remaining-Quota-Month")?,
-		})
+		Self(url)
 	}
 }
 
@@ -218,6 +205,56 @@ impl<const N: usize> LatestResponse<N> {
 		let to_value = self.get(to)?;
 		Some(amount * (to_value / from_value))
 	}
+}
+
+/// [Rate-limit data](https://currencyapi.com/docs/#rate-limit-and-quotas) from response headers.
+#[derive(Debug, Hash, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+pub struct RateLimit {
+	/// How many requests can be made in a minute.
+	pub limit_minute: usize,
+	/// How many requests can be made in a month.
+	pub limit_month: usize,
+	/// How many remaining requests can be made in the minute of request.
+	pub remainig_minute: usize,
+	/// How many remaining requests can be made in the month of request.
+	pub remaining_month: usize,
+}
+
+impl TryFrom<&reqwest::Response> for RateLimit {
+	type Error = ();
+
+	fn try_from(value: &reqwest::Response) -> Result<Self, Self::Error> {
+		let headers = value.headers();
+		let h = |name| {
+			headers
+				.get(name)
+				.ok_or(())
+				.and_then(|value| atoi(value.as_bytes()).ok_or(()))
+		};
+		Ok(Self {
+			limit_minute: h("X-RateLimit-Limit-Quota-Minute")?,
+			limit_month: h("X-RateLimit-Limit-Quota-Month")?,
+			remainig_minute: h("X-RateLimit-Remaining-Quota-Minute")?,
+			remaining_month: h("X-RateLimit-Remaining-Quota-Month")?,
+		})
+	}
+}
+
+/// An error from the API or from the HTTP client.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	/// The rate-limit was hit.
+	#[error("you have hit your rate limit or your monthly limit")]
+	RateLimitError,
+	/// HTTP error.
+	#[error("http error: {0}")]
+	HttpError(#[from] reqwest::Error),
+	/// Failed to parse the response.
+	#[error("failed to parse the response")]
+	ResponseParseError,
+	/// Failed to parse the rate-limit headers.
+	#[error("failed to parse the rate-limits headers from the response")]
+	RateLimitParseError,
 }
 
 #[cfg(test)]

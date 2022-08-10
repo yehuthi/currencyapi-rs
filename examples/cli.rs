@@ -1,5 +1,8 @@
 use clap::{Parser, Subcommand};
-use currencyapi::currency::CurrencyCode;
+use currencyapi::{
+	currency::{self, CurrencyCode},
+	latest,
+};
 
 #[derive(Parser, Debug)]
 pub struct Cli {
@@ -28,19 +31,22 @@ async fn main() {
 	let cli = Cli::parse();
 	let client = reqwest::Client::new();
 
-	type Latest =
-		currencyapi::Latest<{ currencyapi::latest::buffer_size(currencyapi::currency::list::LEN) }>;
-
+	let request = latest::Builder::from(cli.token.as_str());
 	match cli.command {
 		CliCommand::Rates { base, currencies } => {
-			let request = Latest::new(cli.token.as_str(), base, currencies.iter().copied());
-			let response = request.send::<180>(&client).await.unwrap();
+			let mut request = request.currencies::<{ latest::buffer_size(4) }, _>(currencies);
+			request.base_currency(base);
+			let request = request.build();
+			let response = request
+				.send::<{ currency::list::LEN }>(&client)
+				.await
+				.unwrap();
 			for (currency, value) in response.iter() {
 				println!("{currency} {value}");
 			}
 		}
 		CliCommand::Convert { from, to, amount } => {
-			let request = Latest::new(cli.token.as_str(), None, std::iter::empty());
+			let request = request.build();
 			let response = request.send::<180>(&client).await.unwrap();
 			let result = response.convert(from, to, amount).unwrap();
 			println!("{} {} = {} {}", amount, from, result, to);

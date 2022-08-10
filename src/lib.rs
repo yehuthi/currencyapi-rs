@@ -4,5 +4,3 @@
 
 pub mod currency;
 pub mod latest;
-
-pub use latest::Latest;
