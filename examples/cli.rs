@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use currencyapi::{currency::CurrencyCode, Latest};
+use currencyapi::currency::CurrencyCode;
 
 #[derive(Parser, Debug)]
 pub struct Cli {
@@ -27,6 +27,9 @@ pub enum CliCommand {
 async fn main() {
 	let cli = Cli::parse();
 	let client = reqwest::Client::new();
+
+	type Latest =
+		currencyapi::Latest<{ currencyapi::latest::buffer_size(currencyapi::currency::list::LEN) }>;
 
 	match cli.command {
 		CliCommand::Rates { base, currencies } => {

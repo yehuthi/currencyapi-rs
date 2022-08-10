@@ -10,15 +10,33 @@ use smallstr::SmallString;
 use smallvec::SmallVec;
 
 /// [`latest`](https://currencyapi.com/docs/latest) endpoint.
+///
+/// # Type-Parameter `N`
+/// The type-parameter `N` denotes buffer size which depends on how many currencies are going to be requested.
+/// When you make a [`Latest::new`] instance, if you are going to use specify an X amount of `currencies`, then `N` should be `buffer_size(Y)` where Y >= X.
+///
+/// > **Note**
+/// >
+/// > Make sure to wrap the [`buffer_size`] call in curly-braces to avoid synax errors, e.g. `Latest<{buffer_size(20)}>`.
 #[derive(Debug, Hash, Clone)]
-pub struct Latest(SmallString<[u8; 256]>);
+pub struct Latest<const N: usize = { buffer_size(4) }>(SmallString<[u8; N]>);
 
-impl Latest {
+/// Calculates the buffer size for the [`Latest`] `N` type-parameter.
+pub const fn buffer_size(currencies_len: usize) -> usize {
+	"https://api.currencyapi.com/v3/latest?apikey=".len()
+		+ /* API key length */ 36 + "&base_currency=XXX&currencies=".len()
+		+ currencies_len * 3
+		+ /* Comma-separators */ currencies_len.saturating_sub(1)
+}
+
+impl<const N: usize> Latest<N> {
 	/// Creates a new `latest` endpoint request.
 	///
 	/// Takes the [API key](https://currencyapi.com/docs/#authentication-api-key-information) token,
 	/// the [`base_currency`](https://currencyapi.com/docs/latest#:~:text=Your%20API%20Key-,base_currency,-string), and
 	/// the [`currencies`](https://currencyapi.com/docs/latest#:~:text=based%20on%20USD-,currencies,-string) parameters.
+	///
+	/// If you are going to use the `currencies` parameter, make sure to see the documentation for the `N` type-parameter in [`Latest`].
 	pub fn new(
 		token: &str,
 		base_currency: Option<CurrencyCode>,
@@ -44,10 +62,10 @@ impl Latest {
 	}
 
 	/// Sends the request.
-	pub async fn send<const N: usize>(
+	pub async fn send<const M: usize>(
 		&self,
 		client: &reqwest::Client,
-	) -> Result<LatestResponse<N>, Error> {
+	) -> Result<LatestResponse<M>, Error> {
 		let response = client.get(self.0.as_str()).send().await?;
 
 		if response.status() == 429 {
