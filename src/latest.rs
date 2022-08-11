@@ -93,7 +93,7 @@ impl<const N: usize> Request<N> {
 	pub async fn send<const M: usize>(
 		&self,
 		client: &reqwest::Client,
-	) -> Result<LatestResponse<M>, Error> {
+	) -> Result<Response<M>, Error> {
 		let response = client.get(self.0.as_str()).send().await?;
 
 		if response.status() == 429 {
@@ -134,7 +134,7 @@ impl<const N: usize> Request<N> {
 			);
 		}
 
-		Ok(LatestResponse {
+		Ok(Response {
 			last_updated_at,
 			currencies,
 			values,
@@ -171,7 +171,7 @@ impl<'a, const N: usize, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, 
 
 /// [`latest` endpoint](Request) response data.
 #[derive(Debug, Clone)]
-pub struct LatestResponse<const N: usize> {
+pub struct Response<const N: usize> {
 	/// Datetime to let you know then this dataset was last updated. ― [Latest endpoint docs](https://currencyapi.com/docs/latest#:~:text=datetime%20to%20let%20you%20know%20then%20this%20dataset%20was%20last%20updated).
 	pub last_updated_at: DateTime<Utc>,
 	/// The currencies column.
@@ -182,7 +182,7 @@ pub struct LatestResponse<const N: usize> {
 	pub rate_limit: RateLimit,
 }
 
-impl<const N: usize> LatestResponse<N> {
+impl<const N: usize> Response<N> {
 	/// Iterates over the currencies and their values.
 	pub fn iter(&self) -> impl Iterator<Item = (CurrencyCode, f64)> + '_ {
 		std::iter::zip(self.currencies.iter().copied(), self.values.iter().copied())
@@ -266,7 +266,7 @@ mod tests {
 		let usd = (*b"USD").try_into().unwrap();
 		let eur = (*b"EUR").try_into().unwrap();
 		let ils = (*b"ILS").try_into().unwrap();
-		let response = LatestResponse {
+		let response = Response {
 			last_updated_at: Utc::now(),
 			currencies: SmallVec::from([usd, eur, ils]),
 			values: SmallVec::from([1.0, 0.9, 3.1]),
