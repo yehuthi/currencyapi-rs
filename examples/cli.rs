@@ -3,6 +3,7 @@ use currencyapi::{
 	currency::{self, CurrencyCode},
 	latest,
 };
+use rust_decimal::Decimal;
 
 #[derive(Parser, Debug)]
 pub struct Cli {
@@ -38,7 +39,7 @@ async fn main() {
 			request.base_currency(base);
 			let request = request.build();
 			let response = request
-				.send::<{ currency::list::ARRAY.len() }>(&client)
+				.send::<{ currency::list::ARRAY.len() }, Decimal>(&client)
 				.await
 				.unwrap();
 			for (currency, value) in response.iter() {
@@ -47,8 +48,10 @@ async fn main() {
 		}
 		CliCommand::Convert { from, to, amount } => {
 			let request = request.build();
-			let response = request.send::<180>(&client).await.unwrap();
-			let result = response.convert(from, to, amount).unwrap();
+			let response = request.send::<180, Decimal>(&client).await.unwrap();
+			let result = response
+				.convert(from, to, &amount.try_into().unwrap())
+				.unwrap();
 			println!("{} {} = {} {}", amount, from, result, to);
 		}
 	}

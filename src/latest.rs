@@ -1,5 +1,7 @@
 //! API for the [`latest`](https://currencyapi.com/docs/latest) endpoint.
 
+use std::ops::{Div, Mul};
+
 use atoi::atoi;
 use chrono::{DateTime, Utc};
 use serde_json as json;
@@ -90,10 +92,10 @@ pub struct Request<const N: usize>(SmallString<[u8; N]>);
 
 impl<const N: usize> Request<N> {
 	/// Sends the request.
-	pub async fn send<const M: usize>(
+	pub async fn send<const M: usize, T: TryFrom<f64>>(
 		&self,
 		client: &reqwest::Client,
-	) -> Result<Response<M>, Error> {
+	) -> Result<Response<M, T>, Error> {
 		let response = client.get(self.0.as_str()).send().await?;
 
 		if response.status() == 429 {
@@ -130,6 +132,7 @@ impl<const N: usize> Request<N> {
 				value_object
 					.get("value")
 					.and_then(|value| value.as_f64())
+					.and_then(|value| T::try_from(value).ok())
 					.ok_or(Error::ResponseParseError)?,
 			);
 		}
@@ -171,36 +174,40 @@ impl<'a, const N: usize, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, 
 
 /// [`latest` endpoint](Request) response data.
 #[derive(Debug, Clone)]
-pub struct Response<const N: usize> {
+pub struct Response<const N: usize, T> {
 	/// Datetime to let you know then this dataset was last updated. ― [Latest endpoint docs](https://currencyapi.com/docs/latest#:~:text=datetime%20to%20let%20you%20know%20then%20this%20dataset%20was%20last%20updated).
 	pub last_updated_at: DateTime<Utc>,
 	/// The currencies column.
 	pub currencies: SmallVec<[CurrencyCode; N]>,
 	/// The values column.
-	pub values: SmallVec<[f64; N]>,
+	pub values: SmallVec<[T; N]>,
 	/// Rate-limit data.
 	pub rate_limit: RateLimit,
 }
 
-impl<const N: usize> Response<N> {
+impl<const N: usize, T> Response<N, T> {
 	/// Iterates over the currencies and their values.
-	pub fn iter(&self) -> impl Iterator<Item = (CurrencyCode, f64)> + '_ {
-		std::iter::zip(self.currencies.iter().copied(), self.values.iter().copied())
+	pub fn iter(&self) -> impl Iterator<Item = (CurrencyCode, &T)> + '_ {
+		std::iter::zip(self.currencies.iter().copied(), self.values.iter())
 	}
 
 	/// Gets the value for the given currency.
-	pub fn get(&self, currency: CurrencyCode) -> Option<f64> {
+	pub fn get(&self, currency: CurrencyCode) -> Option<&T> {
 		self.currencies
 			.iter()
 			.copied()
 			.position(|c| c == currency)
-			.map(|i| self.values[i])
+			.map(|i| &self.values[i])
 	}
 
 	/// Currency conversion.
 	///
 	/// Returns [`None`] if either currencies are missing.
-	pub fn convert(&self, from: CurrencyCode, to: CurrencyCode, amount: f64) -> Option<f64> {
+	pub fn convert(&self, from: CurrencyCode, to: CurrencyCode, amount: &T) -> Option<T>
+	where
+		for<'x> &'x T: Div<&'x T, Output = T>,
+		for<'x> &'x T: Mul<T, Output = T>,
+	{
 		let from_value = self.get(from)?;
 		let to_value = self.get(to)?;
 		Some(amount * (to_value / from_value))
@@ -272,10 +279,10 @@ mod tests {
 			values: SmallVec::from([1.0, 0.9, 3.1]),
 			rate_limit: Default::default(),
 		};
-		assert_eq!(response.convert(usd, usd, 1234.0), Some(1234.));
-		assert_eq!(response.convert(eur, eur, 1234.0), Some(1234.));
-		assert_eq!(response.convert(ils, ils, 1234.0), Some(1234.));
-		assert_eq!(response.convert(ils, eur, 1.0), Some(1. / 3.1 * 0.9));
-		assert_eq!(response.convert(eur, ils, 1.0), Some(1. / 0.9 * 3.1));
+		assert_eq!(response.convert(usd, usd, &1234.0), Some(1234.));
+		assert_eq!(response.convert(eur, eur, &1234.0), Some(1234.));
+		assert_eq!(response.convert(ils, ils, &1234.0), Some(1234.));
+		assert_eq!(response.convert(ils, eur, &1.0), Some(1. / 3.1 * 0.9));
+		assert_eq!(response.convert(eur, ils, &1.0), Some(1. / 0.9 * 3.1));
 	}
 }
