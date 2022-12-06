@@ -35,7 +35,7 @@ impl Debug for CurrencyCode {
 /// It is chosen for being the most traded currency.
 impl Default for CurrencyCode {
     fn default() -> Self {
-        unsafe { Self::from_bytes_unchecked(*b"USD") }
+        list::USD
     }
 }
 
