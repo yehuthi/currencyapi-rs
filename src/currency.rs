@@ -30,7 +30,7 @@ impl Debug for CurrencyCode {
     }
 }
 
-/// The default currency code is `USD`.
+/// The default currency code is [`USD`](list::USD).
 ///
 /// It is chosen for being the most traded currency.
 impl Default for CurrencyCode {
