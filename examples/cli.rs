@@ -19,9 +19,7 @@ pub enum CliCommand {
 		currencies: Vec<CurrencyCode>,
 	},
 	Convert {
-		#[clap(parse(try_from_str))]
 		from: CurrencyCode,
-		#[clap(parse(try_from_str))]
 		to: CurrencyCode,
 		amount: f64,
 	},
