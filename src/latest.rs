@@ -3,9 +3,8 @@
 use atoi::atoi;
 use chrono::{DateTime, Utc};
 use serde_json as json;
-use smallstr::SmallString;
 
-use crate::{currency::{self, CurrencyCode}, rates::Rates};
+use crate::{currency::CurrencyCode, rates::Rates};
 
 /// A [`Builder`] buffer for all currencies.
 pub type AllCurrencies = std::iter::Empty<CurrencyCode>;
@@ -18,7 +17,7 @@ pub type AllCurrencies = std::iter::Empty<CurrencyCode>;
 /// Builder::from("…").build();
 /// ```
 #[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
-pub struct Builder<'a, const N: usize, T = AllCurrencies> {
+pub struct Builder<'a, T = AllCurrencies> {
 	/// The [API token](https://currencyapi.com/docs/#authentication-api-key-information).
 	pub token: &'a str,
 	/// The [`base_currency`](https://currencyapi.com/docs/latest#:~:text=Your%20API%20Key-,base_currency,-string).
@@ -27,9 +26,9 @@ pub struct Builder<'a, const N: usize, T = AllCurrencies> {
 	pub currencies: T,
 }
 
-impl<'a, const N: usize, T> Builder<'a, N, T> {
+impl<'a, T> Builder<'a, T> {
 	/// Sets the [`currencies`](Builder::currencies).
-	pub fn currencies<const N2: usize, T2>(self, currencies: T2) -> Builder<'a, N2, T2> {
+	pub fn currencies<T2>(self, currencies: T2) -> Builder<'a, T2> {
 		Builder {
 			token: self.token,
 			base_currency: self.base_currency,
@@ -44,7 +43,7 @@ impl<'a, const N: usize, T> Builder<'a, N, T> {
 	}
 }
 
-impl<'a> Builder<'a, { currency::list::ARRAY.len() }, AllCurrencies> {
+impl<'a> Builder<'a, AllCurrencies> {
 	/// Creates a new [`Builder`] with the given [API token](Builder::token).
 	pub const fn new(token: &'a str) -> Self {
 		Builder {
@@ -55,45 +54,35 @@ impl<'a> Builder<'a, { currency::list::ARRAY.len() }, AllCurrencies> {
 	}
 }
 
-impl<'a> From<&'a str> for Builder<'a, { currency::list::ARRAY.len() }, AllCurrencies> {
-	fn from(token: &'a str) -> Self {
-		Self::new(token)
-	}
+impl<'a> From<&'a str> for Builder<'a, AllCurrencies> {
+	#[inline] fn from(token: &'a str) -> Self { Self::new(token) }
 }
 
-impl<'a, const N: usize, T: IntoIterator<Item = CurrencyCode>> Builder<'a, N, T> {
+impl<'a, T: IntoIterator<Item = CurrencyCode>> Builder<'a, T> {
 	/// Builds the [`Request`].
-	pub fn build(self) -> Request<N> {
+	pub fn build(self) -> Request {
 		self.into()
 	}
 }
 
-/// Calculates the [`Builder`] buffer size.
-///
-/// # Examples
-/// ```
-/// # use currencyapi::latest::{Builder, buffer_size};
-/// # use currencyapi::currency;
-/// Builder::from("…").currencies::<{ buffer_size(2) },_>([currency::list::USD, currency::list::EUR]);
-/// ```
-pub const fn buffer_size(currencies_len: usize) -> usize {
-	"https://api.currencyapi.com/v3/latest?apikey=".len()
-		+ /* API key length */ 36 + "&base_currency=XXX&currencies=".len()
-		+ currencies_len * 3
-		+ /* Comma-separators */ currencies_len.saturating_sub(1)
+/// The [`latest`](https://currencyapi.com/docs/latest) endpoint.
+#[derive(Debug)]
+pub struct Request(reqwest::Request);
+
+impl Clone for Request {
+	#[inline] fn clone(&self) -> Self {
+		// try_clone should always succeed since there's no body stream.
+		Self(self.0.try_clone().unwrap())
+	}
 }
 
-/// The [`latest`](https://currencyapi.com/docs/latest) endpoint.
-#[derive(Debug, Hash, Clone)]
-pub struct Request<const N: usize>(SmallString<[u8; N]>);
-
-impl<const N: usize> Request<N> {
+impl Request {
 	/// Sends the request.
-	pub async fn send<const M: usize, T: TryFrom<f64>>(
-		&self,
+	pub async fn send<const N: usize, T: TryFrom<f64>>(
+		self,
 		client: &reqwest::Client,
-	) -> Result<Response<M, T>, Error> {
-		let response = client.get(self.0.as_str()).send().await?;
+	) -> Result<Response<N, T>, Error> {
+		let response = client.execute(self.0).await?;
 
 		if response.status() == 429 {
 			return Err(Error::RateLimitError);
@@ -140,29 +129,42 @@ impl<const N: usize> Request<N> {
 	}
 }
 
-impl<'a, const N: usize, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, N, T>>
-	for Request<N>
+impl<'a, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, T>>
+	for Request
 {
-	fn from(builder: Builder<'a, N, T>) -> Self {
-		let mut url = SmallString::with_capacity(N);
-		url.push_str("https://api.currencyapi.com/v3/latest?apikey=");
-		url.push_str(builder.token);
-		if let Some(base_currency) = builder.base_currency {
-			url.push_str("&base_currency=");
-			url.push_str(base_currency.as_ref());
-		}
+	fn from(builder: Builder<'a, T>) -> Self {
+		use std::io::Write;
+
+		const URL_BUF_CAPACITY: usize = "https://api.currencyapi.com/v3/latest?base_currency=XXX&currencies=".len() + (crate::currency::list::ARRAY.len() + /* slack */ 30) * 4 - 1;
+		let mut url_buf = [0u8; URL_BUF_CAPACITY];
+		let mut writer = &mut url_buf[..];
+
+		writer.write_all(b"https://api.currencyapi.com/v3/latest").unwrap();
+		let sep = if let Some(base_currency) = builder.base_currency {
+			writer.write_all(b"?base_currency=").unwrap();
+			writer.write_all(base_currency.as_ref()).unwrap();
+			b"&"
+		} else { b"?" };
 
 		let mut currencies = builder.currencies.into_iter();
 		if let Some(currencies_head) = currencies.next() {
-			url.push_str("&currencies=");
-			url.push_str(currencies_head.as_ref());
+			writer.write_all(sep).unwrap();
+			writer.write_all(b"currencies=").unwrap();
+			writer.write_all(currencies_head.as_ref()).unwrap();
 			for currency in currencies {
-				url.push_str(",");
-				url.push_str(currency.as_ref());
+				writer.write_all(b",").unwrap();
+				writer.write_all(currency.as_ref()).unwrap();
 			}
 		}
 
-		Self(url)
+		let url = unsafe {
+			// SAFETY: the buffer is built from valid UTF-8.
+			std::str::from_utf8_unchecked(&url_buf)
+		};
+		let url = url.parse::<reqwest::Url>().unwrap();
+		let mut request = reqwest::Request::new(reqwest::Method::GET, url);
+		request.headers_mut().insert("apikey", builder.token.parse().unwrap());
+		Self(request)
 	}
 }
 

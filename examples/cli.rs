@@ -33,7 +33,7 @@ async fn main() {
 	let request = latest::Builder::from(cli.token.as_str());
 	match cli.command {
 		CliCommand::Rates { base, currencies } => {
-			let mut request = request.currencies::<{ latest::buffer_size(4) }, _>(currencies);
+			let mut request = request.currencies(currencies);
 			request.base_currency(base);
 			let request = request.build();
 			let response = request
