@@ -1,14 +1,11 @@
 //! API for the [`latest`](https://currencyapi.com/docs/latest) endpoint.
 
-use std::ops::{Div, Mul};
-
 use atoi::atoi;
 use chrono::{DateTime, Utc};
 use serde_json as json;
 use smallstr::SmallString;
-use smallvec::SmallVec;
 
-use crate::currency::{self, CurrencyCode};
+use crate::{currency::{self, CurrencyCode}, rates::Rates};
 
 /// A [`Builder`] buffer for all currencies.
 pub type AllCurrencies = std::iter::Empty<CurrencyCode>;
@@ -117,30 +114,27 @@ impl<const N: usize> Request<N> {
 					.parse()
 					.map_err(|_| Error::ResponseParseError)
 			})?;
-		let mut currencies = SmallVec::new();
-		let mut values = SmallVec::new();
+		let mut rates = Rates::new();
 
 		let data = payload
 			.get("data")
 			.and_then(|data| data.as_object())
 			.ok_or(Error::ResponseParseError)?;
 		for (currency, value_object) in data {
-			currencies.push(
-				CurrencyCode::try_from(currency.as_str()).map_err(|_| Error::ResponseParseError)?,
-			);
-			values.push(
-				value_object
-					.get("value")
-					.and_then(|value| value.as_f64())
-					.and_then(|value| T::try_from(value).ok())
-					.ok_or(Error::ResponseParseError)?,
-			);
+			if currency.as_str().len() != 3 { continue; } // XXX
+			let currency =
+				CurrencyCode::try_from(currency.as_str()).map_err(|_| Error::ResponseParseError)?;
+			let rate = value_object
+				.get("value")
+				.and_then(|value| value.as_f64())
+				.and_then(|value| T::try_from(value).ok())
+				.ok_or(Error::ResponseParseError)?;
+			rates.push(currency, rate);
 		}
 
 		Ok(Response {
 			last_updated_at,
-			currencies,
-			values,
+			rates,
 			rate_limit,
 		})
 	}
@@ -173,45 +167,14 @@ impl<'a, const N: usize, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, 
 }
 
 /// [`latest` endpoint](Request) response data.
-#[derive(Debug, Clone)]
-pub struct Response<const N: usize, T> {
+#[derive(Debug)]
+pub struct Response<const N: usize, RATE> {
 	/// Datetime to let you know then this dataset was last updated. ― [Latest endpoint docs](https://currencyapi.com/docs/latest#:~:text=datetime%20to%20let%20you%20know%20then%20this%20dataset%20was%20last%20updated).
 	pub last_updated_at: DateTime<Utc>,
-	/// The currencies column.
-	pub currencies: SmallVec<[CurrencyCode; N]>,
-	/// The values column.
-	pub values: SmallVec<[T; N]>,
+	/// The currency rates.
+	pub rates: Rates<N, RATE>,
 	/// Rate-limit data.
 	pub rate_limit: RateLimit,
-}
-
-impl<const N: usize, T> Response<N, T> {
-	/// Iterates over the currencies and their values.
-	pub fn iter(&self) -> impl Iterator<Item = (CurrencyCode, &T)> + '_ {
-		std::iter::zip(self.currencies.iter().copied(), self.values.iter())
-	}
-
-	/// Gets the value for the given currency.
-	pub fn get(&self, currency: CurrencyCode) -> Option<&T> {
-		self.currencies
-			.iter()
-			.copied()
-			.position(|c| c == currency)
-			.map(|i| &self.values[i])
-	}
-
-	/// Currency conversion.
-	///
-	/// Returns [`None`] if either currencies are missing.
-	pub fn convert(&self, from: CurrencyCode, to: CurrencyCode, amount: &T) -> Option<T>
-	where
-		for<'x> &'x T: Div<&'x T, Output = T>,
-		for<'x> &'x T: Mul<T, Output = T>,
-	{
-		let from_value = self.get(from)?;
-		let to_value = self.get(to)?;
-		Some(amount * (to_value / from_value))
-	}
 }
 
 /// [Rate-limit data](https://currencyapi.com/docs/#rate-limit-and-quotas) from response headers.
@@ -262,27 +225,4 @@ pub enum Error {
 	/// Failed to parse the rate-limit headers.
 	#[error("failed to parse the rate-limits headers from the response")]
 	RateLimitParseError,
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_convert() {
-		let usd = (*b"USD").try_into().unwrap();
-		let eur = (*b"EUR").try_into().unwrap();
-		let ils = (*b"ILS").try_into().unwrap();
-		let response = Response {
-			last_updated_at: Utc::now(),
-			currencies: SmallVec::from([usd, eur, ils]),
-			values: SmallVec::from([1.0, 0.9, 3.1]),
-			rate_limit: Default::default(),
-		};
-		assert_eq!(response.convert(usd, usd, &1234.0), Some(1234.));
-		assert_eq!(response.convert(eur, eur, &1234.0), Some(1234.));
-		assert_eq!(response.convert(ils, ils, &1234.0), Some(1234.));
-		assert_eq!(response.convert(ils, eur, &1.0), Some(1. / 3.1 * 0.9));
-		assert_eq!(response.convert(eur, ils, &1.0), Some(1. / 0.9 * 3.1));
-	}
 }

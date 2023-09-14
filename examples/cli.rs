@@ -40,7 +40,7 @@ async fn main() {
 				.send::<{ currency::list::ARRAY.len() }, Decimal>(&client)
 				.await
 				.unwrap();
-			for (currency, value) in response.iter() {
+			for (currency, value) in response.rates.iter() {
 				println!("{currency} {value}");
 			}
 		}
@@ -48,7 +48,8 @@ async fn main() {
 			let request = request.build();
 			let response = request.send::<180, Decimal>(&client).await.unwrap();
 			let result = response
-				.convert(from, to, &amount.try_into().unwrap())
+				.rates
+				.convert(&amount.try_into().unwrap(), from, to)
 				.unwrap();
 			println!("{} {} = {} {}", amount, from, result, to);
 		}
