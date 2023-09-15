@@ -1,12 +1,14 @@
 //! API for the [`latest`](https://currencyapi.com/docs/latest) endpoint.
 
-use std::io;
+use std::{io, collections::HashMap};
 
 use atoi::atoi;
 use chrono::{DateTime, Utc};
+use json::value::RawValue;
+use serde::Deserialize;
 use serde_json as json;
 
-use crate::{currency::CurrencyCode, rates::Rates};
+use crate::{currency::CurrencyCode, rates::Rates, scientific::FromScientific};
 
 /// A [`Builder`] buffer for all currencies.
 pub type AllCurrencies = std::iter::Empty<CurrencyCode>;
@@ -136,49 +138,43 @@ impl Clone for Request {
 
 impl Request {
 	/// Sends the request.
-	pub async fn send<const N: usize, T: TryFrom<f64>>(
+	pub async fn send<const N: usize, RATE: FromScientific>(
 		self,
 		client: &reqwest::Client,
-	) -> Result<Response<N, T>, Error> {
+	) -> Result<Response<N, RATE>, Error> {
 		let response = client.execute(self.0).await?;
+		if response.status() == 429 { return Err(Error::RateLimitError); }
+		let response = response.error_for_status()?;
 
-		if response.status() == 429 {
-			return Err(Error::RateLimitError);
+		#[derive(Deserialize)]
+		struct Payload<'a> {
+			#[serde(borrow)]
+			meta: PayloadMeta<'a>,
+			#[serde(borrow)]
+			data: PayloadData<'a>,
 		}
 
-		let response = response.error_for_status()?;
+		#[derive(Deserialize)]
+		struct PayloadMeta<'a> { last_updated_at: &'a str }
+
+		#[derive(Deserialize)]
+		struct PayloadData<'a> (#[serde(borrow)] HashMap<&'a str, PayloadDataEntry<'a>>);
+
+		#[derive(Deserialize)]
+		struct PayloadDataEntry<'a> { #[serde(borrow)] value: &'a RawValue }
+
 		let rate_limit = (&response)
 			.try_into()
 			.map_err(|_| Error::RateLimitParseError)?;
-		let payload = response.json::<json::Value>().await?;
-		let last_updated_at = payload
-			.get("meta")
-			.and_then(|meta| meta.get("last_updated_at"))
-			.and_then(|last_updated_at| last_updated_at.as_str())
-			.ok_or(Error::ResponseParseError)
-			.and_then(|last_updated_at| {
-				last_updated_at
-					.parse()
-					.map_err(|_| Error::ResponseParseError)
-			})?;
+		let payload = response.bytes().await?;
+		let payload = serde_json::from_slice::<Payload>(&payload).unwrap();
+		let last_updated_at = payload.meta.last_updated_at.parse::<DateTime<Utc>>().unwrap();
 		let mut rates = Rates::new();
-
-		let data = payload
-			.get("data")
-			.and_then(|data| data.as_object())
-			.ok_or(Error::ResponseParseError)?;
-		for (currency, value_object) in data {
-			if currency.as_str().len() != 3 { continue; } // XXX
-			let currency =
-				CurrencyCode::try_from(currency.as_str()).map_err(|_| Error::ResponseParseError)?;
-			let rate = value_object
-				.get("value")
-				.and_then(|value| value.as_f64())
-				.and_then(|value| T::try_from(value).ok())
-				.ok_or(Error::ResponseParseError)?;
-			rates.push(currency, rate);
-		}
-
+		rates.extend_capped(
+			payload.data.0.iter()
+				.filter(|&(&currency, _)| currency.len() == 3) // XXX
+				.map(|(&currency, entry)| (currency.parse().unwrap(), RATE::parse_scientific(entry.value.get()).unwrap_or_else(|_| todo!())))
+		);
 		Ok(Response {
 			last_updated_at,
 			rates,

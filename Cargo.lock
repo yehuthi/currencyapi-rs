@@ -355,6 +355,7 @@ dependencies = [
  "clap",
  "reqwest",
  "rust_decimal",
+ "serde",
  "serde_json",
  "thiserror",
  "tokio",

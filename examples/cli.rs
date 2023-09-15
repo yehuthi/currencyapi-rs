@@ -3,7 +3,6 @@ use currencyapi::{
 	currency::{self, CurrencyCode},
 	latest,
 };
-use rust_decimal::Decimal;
 
 #[derive(Parser, Debug)]
 pub struct Cli {
@@ -25,6 +24,9 @@ pub enum CliCommand {
 	},
 }
 
+#[cfg(feature = "rust_decimal")] type Rate = rust_decimal::Decimal;
+#[cfg(not(feature = "rust_decimal"))] type Rate = f64;
+
 #[tokio::main]
 async fn main() {
 	let cli = Cli::parse();
@@ -38,7 +40,7 @@ async fn main() {
 				.base_currency(base);
 			let request = request.build();
 			let response = request
-				.send::<{ currency::list::ARRAY.len() }, Decimal>(&client)
+				.send::<{ currency::list::ARRAY.len() }, Rate>(&client)
 				.await
 				.unwrap();
 			for (currency, value) in response.rates.iter() {
@@ -47,7 +49,7 @@ async fn main() {
 		}
 		CliCommand::Convert { from, to, amount } => {
 			let request = request.build();
-			let response = request.send::<180, Decimal>(&client).await.unwrap();
+			let response = request.send::<180, Rate>(&client).await.unwrap();
 			let result = response
 				.rates
 				.convert(&amount.try_into().unwrap(), from, to)

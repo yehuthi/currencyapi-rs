@@ -7,6 +7,8 @@ use std::{
 	str::FromStr,
 };
 
+use serde::Deserialize;
+
 /// [Currency code](https://en.wikipedia.org/wiki/ISO_4217).
 ///
 /// It's recommended to use the constants in the [`currency::list`](list) module.
@@ -150,6 +152,23 @@ impl Display for CurrencyCode {
 	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
 		let code: &str = self.as_ref();
 		Display::fmt(&code, f)
+	}
+}
+
+impl<'de> Deserialize<'de> for CurrencyCode {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+		struct Visitor;
+		impl<'de> serde::de::Visitor<'de> for Visitor {
+			type Value = CurrencyCode;
+
+			fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result { formatter.write_str("a currency code") }
+
+			fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: serde::de::Error, {
+				CurrencyCode::from_str(v).map_err(|e| serde::de::Error::custom(e))
+			}
+		}
+
+		deserializer.deserialize_str(Visitor)
 	}
 }
 

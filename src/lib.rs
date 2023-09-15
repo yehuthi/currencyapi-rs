@@ -5,3 +5,4 @@
 pub mod currency;
 pub mod latest;
 pub mod rates;
+pub mod scientific;
