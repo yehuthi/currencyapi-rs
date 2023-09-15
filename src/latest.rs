@@ -1,5 +1,7 @@
 //! API for the [`latest`](https://currencyapi.com/docs/latest) endpoint.
 
+use std::io;
+
 use atoi::atoi;
 use chrono::{DateTime, Utc};
 use serde_json as json;
@@ -17,18 +19,64 @@ pub type AllCurrencies = std::iter::Empty<CurrencyCode>;
 /// Builder::from("…").build();
 /// ```
 #[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
-pub struct Builder<'a, T = AllCurrencies> {
+pub struct Builder<'a, Currencies = AllCurrencies, BaseCurrency = NoBaseCurrency> {
 	/// The [API token](https://currencyapi.com/docs/#authentication-api-key-information).
 	pub token: &'a str,
 	/// The [`base_currency`](https://currencyapi.com/docs/latest#:~:text=Your%20API%20Key-,base_currency,-string).
-	pub base_currency: Option<CurrencyCode>,
+	pub base_currency: BaseCurrency,
 	/// The [`currencies`](https://currencyapi.com/docs/latest#:~:text=based%20on%20USD-,currencies,-string).
-	pub currencies: T,
+	pub currencies: Currencies,
 }
 
-impl<'a, T> Builder<'a, T> {
+/// A base currency parameter for [`Builder`].
+pub struct BaseCurrency<T>(pub T);
+
+/// A type for [`Builder`] indicating the request does not specify a base currency parameter.
+pub struct NoBaseCurrency;
+
+mod private {
+	use super::*;
+	pub trait BaseCurrencyUrlPart {
+		/// Writes the base currency URL parameter into the string.
+		///
+		/// Returns whether there was a base currency to write.
+		/// If there is something to write, writes `prefix` first.
+		fn write(&self, writer: impl io::Write, prefix: &[u8]) -> io::Result<bool>;
+	}
+
+	impl BaseCurrencyUrlPart for NoBaseCurrency {
+		#[inline] fn write(&self, _: impl io::Write, _: &[u8]) -> io::Result<bool> { Ok(false) }
+	}
+
+	impl BaseCurrencyUrlPart for BaseCurrency<CurrencyCode> {
+		fn write(&self, mut writer: impl io::Write, prefix: &[u8]) -> io::Result<bool> {
+			writer.write_all(prefix)?;
+			writer.write_all(b"base_currency=")?;
+			writer.write_all(self.0.as_ref())?;
+			Ok(true)
+		}
+	}
+
+	impl BaseCurrencyUrlPart for BaseCurrency<Option<CurrencyCode>> {
+		fn write(&self, writer: impl io::Write, prefix: &[u8]) -> io::Result<bool> {
+			match self.0 {
+				Some(inner) => BaseCurrency(inner).write(writer, prefix),
+				None => Ok(true),
+			}
+		}
+	}
+}
+
+/// Types that can be used for [`Builder`]'s base currency.
+pub trait BaseCurrencyUrlPart: private::BaseCurrencyUrlPart {}
+impl BaseCurrencyUrlPart for NoBaseCurrency {}
+impl BaseCurrencyUrlPart for BaseCurrency<CurrencyCode> {}
+impl BaseCurrencyUrlPart for BaseCurrency<Option<CurrencyCode>> {}
+
+
+impl<'a, Currencies, BaseCurrency> Builder<'a, Currencies, BaseCurrency> {
 	/// Sets the [`currencies`](Builder::currencies).
-	pub fn currencies<T2>(self, currencies: T2) -> Builder<'a, T2> {
+	pub fn currencies<CurrenciesNew>(self, currencies: CurrenciesNew) -> Builder<'a, CurrenciesNew, BaseCurrency> {
 		Builder {
 			token: self.token,
 			base_currency: self.base_currency,
@@ -37,18 +85,30 @@ impl<'a, T> Builder<'a, T> {
 	}
 
 	/// Sets the [`base_currency`](Builder::base_currency).
-	pub fn base_currency(&mut self, base_currency: Option<CurrencyCode>) -> &mut Self {
-		self.base_currency = base_currency;
-		self
+	pub fn base_currency<BaseCurrencyNew>(self, base_currency: BaseCurrencyNew) -> Builder<'a, Currencies, self::BaseCurrency<BaseCurrencyNew>> where self::BaseCurrency<BaseCurrencyNew>: BaseCurrencyUrlPart {
+		Builder {
+			token: self.token,
+			base_currency: BaseCurrency(base_currency),
+			currencies: self.currencies,
+		}
+	}
+
+	/// Clears the [`base_currency`](Builder::base_currency) parameter. 
+	pub fn base_currency_clear(self) -> Builder<'a, Currencies, NoBaseCurrency> {
+		Builder {
+			token: self.token,
+			base_currency: NoBaseCurrency,
+			currencies: self.currencies,
+		}
 	}
 }
 
-impl<'a> Builder<'a, AllCurrencies> {
+impl<'a> Builder<'a, AllCurrencies, NoBaseCurrency> {
 	/// Creates a new [`Builder`] with the given [API token](Builder::token).
 	pub const fn new(token: &'a str) -> Self {
 		Builder {
 			token,
-			base_currency: None,
+			base_currency: NoBaseCurrency,
 			currencies: std::iter::empty(),
 		}
 	}
@@ -58,11 +118,9 @@ impl<'a> From<&'a str> for Builder<'a, AllCurrencies> {
 	#[inline] fn from(token: &'a str) -> Self { Self::new(token) }
 }
 
-impl<'a, T: IntoIterator<Item = CurrencyCode>> Builder<'a, T> {
+impl<'a, Currencies: IntoIterator<Item = CurrencyCode>, BaseCurrency: BaseCurrencyUrlPart> Builder<'a, Currencies, BaseCurrency> {
 	/// Builds the [`Request`].
-	pub fn build(self) -> Request {
-		self.into()
-	}
+	pub fn build(self) -> Request { self.into() }
 }
 
 /// The [`latest`](https://currencyapi.com/docs/latest) endpoint.
@@ -129,10 +187,10 @@ impl Request {
 	}
 }
 
-impl<'a, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, T>>
+impl<'a, Currencies: IntoIterator<Item = CurrencyCode>, BaseCurrency: BaseCurrencyUrlPart> From<Builder<'a, Currencies, BaseCurrency>>
 	for Request
 {
-	fn from(builder: Builder<'a, T>) -> Self {
+	fn from(builder: Builder<'a, Currencies, BaseCurrency>) -> Self {
 		use std::io::Write;
 
 		const URL_BUF_CAPACITY: usize = "https://api.currencyapi.com/v3/latest?base_currency=XXX&currencies=".len() + (crate::currency::list::ARRAY.len() + /* slack */ 30) * 4 - 1;
@@ -140,11 +198,7 @@ impl<'a, T: IntoIterator<Item = CurrencyCode>> From<Builder<'a, T>>
 		let mut writer = &mut url_buf[..];
 
 		writer.write_all(b"https://api.currencyapi.com/v3/latest").unwrap();
-		let sep = if let Some(base_currency) = builder.base_currency {
-			writer.write_all(b"?base_currency=").unwrap();
-			writer.write_all(base_currency.as_ref()).unwrap();
-			b"&"
-		} else { b"?" };
+		let sep = if builder.base_currency.write(&mut writer, b"?").unwrap() { b"&" } else { b"?" };
 
 		let mut currencies = builder.currencies.into_iter();
 		if let Some(currencies_head) = currencies.next() {
