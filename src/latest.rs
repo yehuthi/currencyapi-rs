@@ -93,7 +93,7 @@ impl<'a, Currencies, BaseCurrency> Builder<'a, Currencies, BaseCurrency> {
 		}
 	}
 
-	/// Clears the [`base_currency`](Builder::base_currency) parameter. 
+	/// Clears the [`base_currency`](Builder::base_currency) parameter.
 	pub fn base_currency_clear(self) -> Builder<'a, Currencies, NoBaseCurrency> {
 		Builder {
 			token: self.token,
