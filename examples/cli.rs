@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use currencyapi::{
 	currency::{self, CurrencyCode},
-	latest,
+	latest, RateLimitIgnore,
 };
 
 #[derive(Parser, Debug)]
@@ -40,7 +40,7 @@ async fn main() {
 				.base_currency(base);
 			let request = request.build();
 			let response = request
-				.send::<{ currency::list::ARRAY.len() }, Rate>(&client)
+				.send::<{ currency::list::ARRAY.len() }, Rate, RateLimitIgnore>(&client)
 				.await
 				.unwrap();
 			for (currency, value) in response.rates.iter() {
@@ -49,7 +49,7 @@ async fn main() {
 		}
 		CliCommand::Convert { from, to, amount } => {
 			let request = request.build();
-			let response = request.send::<180, Rate>(&client).await.unwrap();
+			let response = request.send::<180, Rate, RateLimitIgnore>(&client).await.unwrap();
 			let result = response
 				.rates
 				.convert(&amount.try_into().unwrap(), from, to)

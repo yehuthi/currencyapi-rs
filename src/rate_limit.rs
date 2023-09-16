@@ -1,5 +1,7 @@
 //! [`RateLimit`]
 
+use std::convert::Infallible;
+
 /// [Rate-limit data](https://currencyapi.com/docs/#rate-limit-and-quotas) from response headers.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct RateLimit {
@@ -12,6 +14,9 @@ pub struct RateLimit {
 	/// How many remaining requests can be made in the month of request.
 	pub remaining_month: usize,
 }
+
+/// Ignore rate limit data.
+pub struct RateLimitIgnore;
 
 impl TryFrom<&reqwest::Response> for RateLimit {
 	type Error = ();
@@ -33,3 +38,19 @@ impl TryFrom<&reqwest::Response> for RateLimit {
 	}
 }
 
+impl TryFrom<&reqwest::Response> for RateLimitIgnore {
+	type Error = Infallible;
+	#[inline] fn try_from(_: &reqwest::Response) -> Result<Self, Self::Error> { Ok(RateLimitIgnore) }
+}
+
+
+mod private {
+	use super::*;
+	pub trait Sealed<'a>: TryFrom<&'a reqwest::Response> {}
+	impl<'a> Sealed<'a> for RateLimit {}
+	impl<'a> Sealed<'a> for RateLimitIgnore {}
+}
+
+pub trait RateLimitData<'a>: private::Sealed<'a> {}
+impl<'a> RateLimitData<'a> for RateLimit {}
+impl<'a> RateLimitData<'a> for RateLimitIgnore {}
