@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use currencyapi::{
-	currency::{self, CurrencyCode},
-	latest, RateLimitIgnore,
+	currency::{CurrencyCode},
+	latest, RateLimitIgnore, Rates,
 };
 
 #[derive(Parser, Debug)]
@@ -35,26 +35,20 @@ async fn main() {
 	let request = latest::Builder::from(cli.token.as_str());
 	match cli.command {
 		CliCommand::Rates { base, currencies } => {
-			let request = request
-				.currencies(currencies)
-				.base_currency(base);
-			let request = request.build();
-			let response = request
-				.send::<{ currency::list::ARRAY.len() }, Rate, RateLimitIgnore>(&client)
+			let mut rates = Rates::<Rate>::new();
+			let request = request.base_currency(base).currencies(currencies).build();
+			let metadata = rates
+				.fetch_latest::<RateLimitIgnore>(&client, request)
 				.await
 				.unwrap();
-			for (currency, value) in response.rates.iter() {
-				println!("{currency} {value}");
-			}
+			println!("Fetched {} rates as of {}", rates.len(), metadata.last_updated_at);
+			for (currency, value) in rates.iter() { println!("{currency} {value}"); }
 		}
 		CliCommand::Convert { from, to, amount } => {
-			let request = request.build();
-			let response = request.send::<180, Rate, RateLimitIgnore>(&client).await.unwrap();
-			let result = response
-				.rates
-				.convert(&amount.try_into().unwrap(), from, to)
-				.unwrap();
-			println!("{} {} = {} {}", amount, from, result, to);
+			let mut rates = Rates::<Rate>::new();
+			let request = request.currencies([from,to]).build();
+			rates.fetch_latest::<RateLimitIgnore>(&client, request).await.unwrap();
+			println!("{} {} = {} {}", amount, from, rates.convert(&amount.try_into().unwrap(), from, to).unwrap(), to);
 		}
 	}
 }

@@ -5,13 +5,13 @@ use std::{mem::{MaybeUninit, self}, fmt, ops::{Div, Mul}};
 use crate::currency::CurrencyCode;
 
 /// Currency rates.
-pub struct Rates<const N: usize, RATE> {
+pub struct Rates<RATE, const N: usize = { crate::currency::list::ARRAY.len() + /* slack */ 10 }> {
 	currency: [MaybeUninit<CurrencyCode>; N],
 	rate: [MaybeUninit<RATE>; N],
 	len: u8,
 }
 
-impl<const N: usize, RATE> Rates<N, RATE> {
+impl<const N: usize, RATE> Rates<RATE, N> {
 	/// Creates a new [`Rates`] value.
 	pub const fn new() -> Self { Self {
 		currency: [MaybeUninit::uninit(); N],
@@ -111,9 +111,9 @@ impl<const N: usize, RATE> Rates<N, RATE> {
 		Some(amount * (to_value / from_value))
 	}
 }
-impl<const N: usize, RATE> Default for Rates<N, RATE> { #[inline] fn default() -> Self { Self::new() } }
+impl<const N: usize, RATE> Default for Rates<RATE, N> { #[inline] fn default() -> Self { Self::new() } }
 
-impl<const N: usize, RATE: fmt::Debug> fmt::Debug for Rates<N, RATE> {
+impl<const N: usize, RATE: fmt::Debug> fmt::Debug for Rates<RATE, N> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut m = f.debug_map();
 		for (currency, rate) in self.iter() {
@@ -130,7 +130,7 @@ mod test {
 	#[test]
 	fn test_convert() {
 		use crate::currency::list::*;
-		let mut rates = Rates::<3, f64>::new();
+		let mut rates = Rates::<f64, 3>::new();
 		rates.push(USD, 1.0);
 		rates.push(EUR, 0.9);
 		rates.push(ILS, 3.1);

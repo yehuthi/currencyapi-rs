@@ -9,3 +9,12 @@ mod rate_limit;   pub use rate_limit::{RateLimit, RateLimitIgnore};
 mod error;        pub use error::Error;
 
 pub mod latest;
+
+use rate_limit::RateLimitData;
+
+impl<const N: usize, RATE> Rates<RATE, N> {
+    /// Fetches a [`latest`] request.
+    pub async fn fetch_latest<RateLimit: for<'x> RateLimitData<'x>>(&mut self, client: &reqwest::Client, request: latest::Request) -> Result<latest::Metadata<RateLimit>, Error> where RATE: FromScientific {
+        request.send::<N,RATE,RateLimit>(self, client).await
+    }
+}

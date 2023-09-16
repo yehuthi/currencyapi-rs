@@ -6,7 +6,7 @@ use serde_json::value::RawValue;
 
 use crate::{currency::CurrencyCode, scientific::FromScientific, rates::Rates, Error, rate_limit::RateLimitData};
 
-use super::{url::BaseCurrencyUrlPart, Response};
+use super::{url::BaseCurrencyUrlPart, Metadata};
 
 /// Request to the [`latest`](https://currencyapi.com/docs/latest) endpoint.
 #[derive(Debug)]
@@ -119,8 +119,9 @@ impl Request {
 	/// Sends the request.
 	#[inline] pub async fn send<const N: usize, RATE: FromScientific, RateLimit: for<'x> RateLimitData<'x>>(
 		self,
+		rates: &mut Rates<RATE, N>,
 		client: &reqwest::Client,
-	) -> Result<Response<N, RATE, RateLimit>, Error> {
+	) -> Result<Metadata<RateLimit>, Error> {
 		let response = client.execute(self.0).await?;
 		if response.status() == 429 { return Err(Error::RateLimitError); }
 		let response = response.error_for_status()?;
@@ -148,14 +149,12 @@ impl Request {
 		let payload = response.bytes().await?;
 		let payload = serde_json::from_slice::<Payload>(&payload).unwrap();
 		let last_updated_at = payload.meta.last_updated_at.parse::<DateTime<Utc>>().unwrap();
-		let mut rates = Rates::new();
 		rates.extend_capped(
 			payload.data.0.iter()
 				.map(|(&currency, entry)| (currency.parse().unwrap(), RATE::parse_scientific(entry.value.get()).unwrap_or_else(|_| todo!())))
 		);
-		Ok(Response {
+		Ok(Metadata {
 			last_updated_at,
-			rates,
 			rate_limit,
 		})
 	}
