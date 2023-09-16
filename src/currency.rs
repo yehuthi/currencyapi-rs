@@ -68,9 +68,6 @@ impl CurrencyCode {
 			buf[n] = code[n];
 			n += 1;
 		}
-		if N < CURRENCY_LEN_MAX {
-			buf[N] = 0;
-		}
 		std::mem::transmute(buf)
 	}
 
