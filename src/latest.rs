@@ -172,7 +172,6 @@ impl Request {
 		let mut rates = Rates::new();
 		rates.extend_capped(
 			payload.data.0.iter()
-				.filter(|&(&currency, _)| currency.len() == 3) // XXX
 				.map(|(&currency, entry)| (currency.parse().unwrap(), RATE::parse_scientific(entry.value.get()).unwrap_or_else(|_| todo!())))
 		);
 		Ok(Response {
