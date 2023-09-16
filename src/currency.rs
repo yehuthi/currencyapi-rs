@@ -14,12 +14,26 @@ const CURRENCY_LEN_MAX: usize = 5;
 #[derive(Debug, Clone, Copy)]
 #[repr(C, align(8))]
 pub struct CurrencyCode {
-	/// The first `CURRENCY_LEN_MIN` letters of the code in uppercase alpha ASCII bytes.
-	///
-	/// The tail is split to allow niche optimization.
+	// Notes about the representation of the code:
+	// - Variable-length (CURRENCY_LEN_MIN to CURRENCY_LEN_MAX).
+	// - Stored in 8 bytes.
+	// - Its value is the code in uppercase ASCII, followed by zeroes.
+	// - The first CURRENCY_LEN_MIN is split as NonZeroU8 to enable niche optimization.
+
+	/// The first `CURRENCY_LEN_MIN` letters of the code.
 	code_head: [NonZeroU8; CURRENCY_LEN_MIN],
-	/// The tail of the code in uppercase alpha ASCII bytes.
+	/// The tail of the code.
 	code_tail: [u8; CURRENCY_LEN_MAX - CURRENCY_LEN_MIN],
+	/// Padding, must be zeroed out.
+	padding: [u8; 8 - CURRENCY_LEN_MAX],
+}
+
+impl CurrencyCode {
+	const fn as_u64(self) -> u64 {
+		unsafe {
+			*(&self as *const Self as *const u8 as *const u64)
+		}
+	}
 }
 
 /// The default currency code is [`USD`](list::USD).
@@ -28,28 +42,22 @@ pub struct CurrencyCode {
 impl Default for CurrencyCode { #[inline] fn default() -> Self { list::USD } }
 
 impl PartialEq for CurrencyCode {
-	#[inline] fn eq(&self, other: &Self) -> bool {
-		<Self as AsRef<[u8]>>::as_ref(&self) == <Self as AsRef<[u8]>>::as_ref(&other)
-	}
-}
-
-impl Eq for CurrencyCode {}
+	#[inline] fn eq(&self, other: &Self) -> bool { self.as_u64() == other.as_u64() }
+} impl Eq for CurrencyCode {}
 
 impl Hash for CurrencyCode {
-	#[inline] fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		<Self as AsRef<[u8]>>::as_ref(&self).hash(state)
-	}
+	#[inline] fn hash<H: std::hash::Hasher>(&self, state: &mut H) { self.as_u64().hash(state) }
 }
 
 impl PartialOrd for CurrencyCode {
 	#[inline] fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		<Self as AsRef<[u8]>>::as_ref(&self).partial_cmp(<Self as AsRef<[u8]>>::as_ref(&other))
+		self.as_u64().partial_cmp(&other.as_u64())
 	}
 }
 
 impl Ord for CurrencyCode {
 	#[inline] fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		<Self as AsRef<[u8]>>::as_ref(&self).cmp(<Self as AsRef<[u8]>>::as_ref(&other))
+		self.as_u64().cmp(&other.as_u64())
 	}
 }
 
@@ -57,11 +65,9 @@ impl CurrencyCode {
 	/// Creates a new [`CurrencyCode`] value.
 	///
 	/// # Safety
-	/// - See [`CurrencyCode::new_unchecked`].
-	/// - The const parameter `N` must be in the range [2..5].
-	/// - If `N` is smaller than the code's length, the code must be NUL-terminated.
-	#[doc(hidden)]
-	pub const unsafe fn from_array_unchecked<const N: usize>(code: [u8; N]) -> Self {
+	/// - See comments for [`CurrencyCode`] struct.
+	/// - The const parameter `N` must be in the range [CURRENCY_LEN_MIN..CURRENCY_LEN_MAX].
+	const unsafe fn from_array_unchecked<const N: usize>(code: [u8; N]) -> Self {
 		let mut buf = [0u8; mem::size_of::<CurrencyCode>()];
 		let mut n = 0;
 		while n < N {
@@ -201,10 +207,17 @@ mod tests {
 			NonZeroU8::new_unchecked(b'V'),
 		] },
 		code_tail: [b'A', b'X', 0],
+		padding: [0; 8 - CURRENCY_LEN_MAX],
 		};
 
 	#[test]
 	fn test_repr() {
+		assert_eq!(
+			mem::size_of::<CurrencyCode>(),
+			mem::size_of::<u64>(),
+			"sizeof(CurrencyCode) = sizeof(u64)"
+		);
+
 		let avax = AVAX_MANUAL;
 		assert_eq!(
 			&avax as *const _ as usize,
