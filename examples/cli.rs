@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use currencyapi::{
-	currency::{CurrencyCode},
+	currency::CurrencyCode,
 	latest, RateLimitIgnore, Rates,
 };
 
