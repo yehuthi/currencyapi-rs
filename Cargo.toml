@@ -10,10 +10,10 @@ keywords = ["currency", "convert", "freecurrencyapi", "money", "api"]
 edition = "2021"
 
 [dependencies]
-atoi = "2.0.0"
+atoi = { version = "2.0.0", default-features = false }
 bstringify = "0.1.2"
-reqwest = { version = "0.11.20", features = ["json"] }
-rust_decimal = { version = "1.32.0", optional = true }
+reqwest = { version = "0.11.20" }
+rust_decimal = { version = "1.32.0", optional = true, default-features = false }
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = { version = "1.0.105", features = ["raw_value"] }
 thiserror = "1.0.48"
