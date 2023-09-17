@@ -2,10 +2,10 @@
 
 use std::{mem::{MaybeUninit, self}, fmt, ops::{Div, Mul}};
 
-use crate::currency::CurrencyCode;
+use crate::CurrencyCode;
 
 /// Currency rates.
-pub struct Rates<RATE, const N: usize = { crate::currency::list::ARRAY.len() + /* slack */ 10 }> {
+pub struct Rates<RATE, const N: usize = { crate::currency::ARRAY.len() + /* slack */ 10 }> {
 	currency: [MaybeUninit<CurrencyCode>; N],
 	rate: [MaybeUninit<RATE>; N],
 	len: u8,
@@ -132,7 +132,7 @@ mod test {
 
 	#[test]
 	fn test_convert() {
-		use crate::currency::list::*;
+		use crate::currency::*;
 		let mut rates = Rates::<f64, 3>::new();
 		rates.push(USD, 1.0);
 		rates.push(EUR, 0.9);
@@ -146,7 +146,7 @@ mod test {
 
 	#[test]
 	fn test_duplicates() {
-		use crate::currency::list::*;
+		use crate::currency::*;
 		let mut rates = Rates::<f64, 10>::new();
 		rates.push(USD, 1.0);
 		rates.push(EUR, 2.0);

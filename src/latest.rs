@@ -5,7 +5,7 @@ use std::{collections::HashMap, str::FromStr, io};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 
-use crate::{currency::CurrencyCode, scientific::FromScientific, rates::Rates, Error, rate_limit::RateLimitData, url::{UrlPart, NoBaseCurrency, self}, RateLimitIgnore};
+use crate::{CurrencyCode, scientific::FromScientific, rates::Rates, Error, rate_limit::RateLimitData, url::{UrlPart, NoBaseCurrency, self}, RateLimitIgnore};
 
 /// Request to the [`latest`](https://currencyapi.com/docs/latest) endpoint.
 #[derive(Debug)]

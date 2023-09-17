@@ -169,12 +169,12 @@ pub mod list {
 		($from_fn:expr, $($currency:ident),*) => {
 			$(
 				#[doc=concat!("The [", stringify!($currency), "](https://www.google.com/search?q=USD+to+", stringify!($currency), ") currency code.")]
-				pub const $currency: crate::currency::CurrencyCode = unsafe { crate::currency::CurrencyCode::from_array_unchecked(*bstringify::bstringify!($currency)) };
+				pub const $currency: crate::CurrencyCode = unsafe { crate::CurrencyCode::from_array_unchecked(*bstringify::bstringify!($currency)) };
 			)*
 			/// The length of all currencies defined in this module.
 			const LEN: usize = 0 $(+ { stringify!($currency); 1} )*;
 			/// An array of all the currencies defined in this module.
-			pub const ARRAY: [crate::currency::CurrencyCode; LEN] = [ $( $currency ),* ];
+			pub const ARRAY: [crate::CurrencyCode; LEN] = [ $( $currency ),* ];
 		};
 	}
 

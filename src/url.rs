@@ -4,7 +4,7 @@ use std::io;
 
 pub mod capacity {
 	// const ISO8601_LEN_MAX: usize = 30;
-	const CURRENCIES_MAX_CAPACITY: usize = (crate::currency::list::ARRAY.len() + /* slack */ 10) * 4 - 1;
+	const CURRENCIES_MAX_CAPACITY: usize = (crate::currency::ARRAY.len() + /* slack */ 10) * 4 - 1;
 
 	// pub const URL_CAPACITY_STATUS: usize = "https://api.currencyapi.com/v3/status".len();
 	// pub const URL_CAPACITY_CURRENCIES: usize = "https://api.currencyapi.com/v3/currencies?currencies=".len() + CURRENCIES_MAX_CAPACITY;

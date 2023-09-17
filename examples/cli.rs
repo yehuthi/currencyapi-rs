@@ -1,9 +1,6 @@
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
-use currencyapi::{
-	currency::CurrencyCode,
-	latest, RateLimitIgnore, Rates,
-};
+use currencyapi::{CurrencyCode, RateLimitIgnore, Rates};
 
 #[derive(Parser, Debug)]
 pub struct Cli {
