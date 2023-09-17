@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use currencyapi::{
 	currency::CurrencyCode,
@@ -38,7 +39,7 @@ async fn main() {
 			let mut rates = Rates::<Rate>::new();
 			let request = request.base_currency(base).currencies(currencies).build();
 			let metadata = rates
-				.fetch_latest::<RateLimitIgnore>(&client, request)
+				.fetch_latest::<DateTime<Utc>, RateLimitIgnore>(&client, request)
 				.await
 				.unwrap();
 			println!("Fetched {} rates as of {}", rates.len(), metadata.last_updated_at);
@@ -47,7 +48,7 @@ async fn main() {
 		CliCommand::Convert { from, to, amount } => {
 			let mut rates = Rates::<Rate>::new();
 			let request = request.currencies([from,to]).build();
-			rates.fetch_latest::<RateLimitIgnore>(&client, request).await.unwrap();
+			rates.fetch_latest::<DateTime<Utc>, RateLimitIgnore>(&client, request).await.unwrap();
 			println!("{} {} = {} {}", amount, from, rates.convert(&amount.try_into().unwrap(), from, to).unwrap(), to);
 		}
 	}

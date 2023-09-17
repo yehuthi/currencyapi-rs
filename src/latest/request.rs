@@ -1,6 +1,5 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 
@@ -117,11 +116,11 @@ impl<'a, Currencies: IntoIterator<Item = CurrencyCode>, BaseCurrency: BaseCurren
 
 impl Request {
 	/// Sends the request.
-	#[inline] pub async fn send<const N: usize, RATE: FromScientific, RateLimit: for<'x> RateLimitData<'x>>(
+	#[inline] pub async fn send<const N: usize, DateTime: FromStr, RATE: FromScientific, RateLimit: for<'x> RateLimitData<'x>>(
 		self,
 		rates: &mut Rates<RATE, N>,
 		client: &reqwest::Client,
-	) -> Result<Metadata<RateLimit>, Error> {
+	) -> Result<Metadata<DateTime, RateLimit>, Error> {
 		let response = client.execute(self.0).await?;
 		if response.status() == 429 { return Err(Error::RateLimitError); }
 		let response = response.error_for_status()?;
@@ -148,7 +147,7 @@ impl Request {
 			.map_err(|_| Error::RateLimitParseError)?;
 		let payload = response.bytes().await?;
 		let payload = serde_json::from_slice::<Payload>(&payload).unwrap();
-		let last_updated_at = payload.meta.last_updated_at.parse::<DateTime<Utc>>().unwrap();
+		let last_updated_at = payload.meta.last_updated_at.parse::<DateTime>().unwrap_or_else(|_| todo!());
 		rates.extend_capped(
 			payload.data.0.iter()
 				.map(|(&currency, entry)| (currency.parse().unwrap(), RATE::parse_scientific(entry.value.get()).unwrap_or_else(|_| todo!())))
