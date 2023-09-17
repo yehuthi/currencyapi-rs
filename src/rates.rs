@@ -57,10 +57,10 @@ impl<const N: usize, RATE> Rates<RATE, N> {
 
 	/// Iterates over currency rates.
 	pub fn iter(&self) -> impl Iterator<Item = (CurrencyCode, &RATE)> {
-		self.currencies().iter().copied().zip(self.rates().iter())
+		self.currencies().iter().copied().zip(self.rates().iter()).rev()
 	}
 
-	/// Pushes a new currency rate.
+	/// Pushes a new currency rate. See [`Rates::push`].
 	///
 	/// # Safety
 	/// Ensure there is space for the new rate, i.e. that [`Rates::len`] < `N`.
@@ -72,6 +72,9 @@ impl<const N: usize, RATE> Rates<RATE, N> {
 	}
 
 	/// Pushes a new currency rate, if the [`Rates`] is not full.
+	///
+	/// Does not check for duplicates, but other functions should
+	/// use the latest pushed rate of a currency.
 	///
 	/// Returns whether the rate was inserted.
 	pub fn push(&mut self, currency: CurrencyCode, rate: RATE) -> bool {
@@ -139,5 +142,16 @@ mod test {
 		assert_eq!(rates.convert(&1234.0, ILS, ILS), Some(1234.));
 		assert_eq!(rates.convert(&1.0, ILS, EUR), Some(1. / 3.1 * 0.9));
 		assert_eq!(rates.convert(&1.0, EUR, ILS), Some(1. / 0.9 * 3.1));
+	}
+
+	#[test]
+	fn test_duplicates() {
+		use crate::currency::list::*;
+		let mut rates = Rates::<f64, 10>::new();
+		rates.push(USD, 1.0);
+		rates.push(EUR, 2.0);
+		assert_eq!(rates.get(USD).unwrap(), &1.0);
+		rates.push(USD, 3.0);
+		assert_eq!(rates.get(USD).unwrap(), &3.0);
 	}
 }
