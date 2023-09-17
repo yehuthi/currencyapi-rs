@@ -10,7 +10,7 @@ const CURRENCY_LEN_MAX: usize = 5;
 
 /// [Currency code](https://en.wikipedia.org/wiki/ISO_4217).
 ///
-/// It's recommended to use the constants in the [`currency::list`](list) module.
+/// It's recommended to use the constants in the [`currencies`](list) module.
 #[derive(Debug, Clone, Copy)]
 #[repr(C, align(8))]
 pub struct CurrencyCode {
@@ -81,7 +81,8 @@ impl CurrencyCode {
 	///
 	/// # Safety
 	/// Ensure that the code's length is within range [2..5].
-	/// It must consist only of uppercase ASCII characters.
+	/// The code must consist only of uppercase ASCII characters, and be terminated by zeroes until
+	/// the end of the slice.
 	pub unsafe fn new_unchecked(code: &[u8]) -> Self {
 		let mut buf = [0u8; CURRENCY_LEN_MAX];
 		ptr::copy_nonoverlapping::<u8>(
@@ -159,7 +160,10 @@ pub enum Error {
 }
 
 pub mod list {
-	//! A list of currencies.
+	//! [Currencies](super::CurrencyCode) constants.
+	//!
+	//! This module defines all known currencies as constants, as well as [`ARRAY`]
+	//! which contains all of them in a constant array.
 
 	/// Defines const [`super::CurrencyCode`]s.
 	///

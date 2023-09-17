@@ -4,10 +4,10 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	/// The rate-limit was hit.
-	#[error("you have hit your rate limit or your monthly limit")]
+	#[error("exceeded rate limit or month limit")]
 	RateLimitError,
 	/// HTTP error.
-	#[error("http error: {0}")]
+	#[error("HTTP error: {0}")]
 	HttpError(#[from] reqwest::Error),
 	/// Failed to parse the response.
 	#[error("failed to parse the response")]

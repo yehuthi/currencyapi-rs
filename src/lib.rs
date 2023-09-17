@@ -18,7 +18,7 @@ use std::str::FromStr;
 use rate_limit::RateLimitData;
 
 impl<const N: usize, RATE> Rates<RATE, N> {
-    /// Fetches a [`latest`] request.
+    /// Fetches a [`latest`] [`Request`](latest::Request).
     pub async fn fetch_latest<DateTime: FromStr, RateLimit: for<'x> RateLimitData<'x>>(&mut self, client: &reqwest::Client, request: latest::Request) -> Result<latest::Metadata<DateTime, RateLimit>, Error> where RATE: FromScientific {
         request.send::<N, DateTime, RATE, RateLimit>(self, client).await
     }
