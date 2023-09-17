@@ -1,11 +1,11 @@
-use std::{collections::HashMap, str::FromStr};
+//! API for the [`latest`](https://currencyapi.com/docs/latest) endpoint.
+
+use std::{collections::HashMap, str::FromStr, io};
 
 use serde::Deserialize;
 use serde_json::value::RawValue;
 
-use crate::{currency::CurrencyCode, scientific::FromScientific, rates::Rates, Error, rate_limit::RateLimitData};
-
-use super::{url::BaseCurrencyUrlPart, Metadata};
+use crate::{currency::CurrencyCode, scientific::FromScientific, rates::Rates, Error, rate_limit::RateLimitData, url::{UrlPart, NoBaseCurrency, self}, RateLimitIgnore};
 
 /// Request to the [`latest`](https://currencyapi.com/docs/latest) endpoint.
 #[derive(Debug)]
@@ -19,12 +19,6 @@ impl Clone for Request {
 }
 
 /// [`Request`] builder.
-///
-/// # Examples
-/// ```
-/// # use currencyapi::latest::Builder;
-/// Builder::from("…").build();
-/// ```
 #[derive(Debug, Hash, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct Builder<'a, Currencies = AllCurrencies, BaseCurrency = NoBaseCurrency> {
 	/// The [API token](https://currencyapi.com/docs/#authentication-api-key-information).
@@ -37,12 +31,6 @@ pub struct Builder<'a, Currencies = AllCurrencies, BaseCurrency = NoBaseCurrency
 
 /// A [`Builder`] buffer for all currencies.
 pub type AllCurrencies = std::iter::Empty<CurrencyCode>;
-
-/// A base currency parameter for [`Builder`].
-pub struct BaseCurrency<T>(pub T);
-
-/// A type for [`Builder`] indicating the request does not specify a base currency parameter.
-pub struct NoBaseCurrency;
 
 impl<'a> From<&'a str> for Builder<'a, AllCurrencies, NoBaseCurrency> {
 	#[inline] fn from(token: &'a str) -> Self { Self::new(token) }
@@ -59,10 +47,10 @@ impl<'a, Currencies, BaseCurrency> Builder<'a, Currencies, BaseCurrency> {
 	}
 
 	/// Sets the [`base_currency`](Builder::base_currency).
-	#[inline] pub fn base_currency<BaseCurrencyNew>(self, base_currency: BaseCurrencyNew) -> Builder<'a, Currencies, self::BaseCurrency<BaseCurrencyNew>> where self::BaseCurrency<BaseCurrencyNew>: BaseCurrencyUrlPart {
+	#[inline] pub fn base_currency<BaseCurrencyNew>(self, base_currency: BaseCurrencyNew) -> Builder<'a, Currencies, crate::url::BaseCurrency<BaseCurrencyNew>> where crate::url::BaseCurrency<BaseCurrencyNew>: UrlPart {
 		Builder {
 			token: self.token,
-			base_currency: BaseCurrency(base_currency),
+			base_currency: crate::url::BaseCurrency(base_currency),
 			currencies: self.currencies,
 		}
 	}
@@ -88,15 +76,23 @@ impl<'a> Builder<'a, AllCurrencies, NoBaseCurrency> {
 	}
 }
 
-impl<'a, Currencies: IntoIterator<Item = CurrencyCode>, BaseCurrency: BaseCurrencyUrlPart> Builder<'a, Currencies, BaseCurrency> {
+impl<'a, Currencies: IntoIterator<Item = CurrencyCode>, BaseCurrency: UrlPart> Builder<'a, Currencies, BaseCurrency> {
 	/// Builds the [`Request`].
 	#[inline] pub fn build(self) -> Request { self.into() }
 }
 
-impl<'a, Currencies: IntoIterator<Item = CurrencyCode>, BaseCurrency: BaseCurrencyUrlPart> From<Builder<'a, Currencies, BaseCurrency>> for Request {
+impl<'a, Currencies: IntoIterator<Item = CurrencyCode>, BaseCurrency> Builder<'a, Currencies, BaseCurrency> where BaseCurrency: crate::url::UrlPart {
+	fn write_url(self, mut writer: impl io::Write) -> io::Result<()> {
+		url::base::LATEST.write_url_part(&mut writer, b"")?;
+		let sep = if self.base_currency.write_url_part(&mut writer, b"?")? { b"&" } else { b"?" };
+		url::Currencies(self.currencies).write_url_part(writer, sep)?;
+		Ok(())
+	}
+}
+
+impl<'a, Currencies: IntoIterator<Item = CurrencyCode>, BaseCurrency: UrlPart> From<Builder<'a, Currencies, BaseCurrency>> for Request {
 	#[inline] fn from(builder: Builder<'a, Currencies, BaseCurrency>) -> Self {
-		const URL_BUF_CAPACITY: usize = "https://api.currencyapi.com/v3/latest?base_currency=XXX&currencies=".len() + (crate::currency::list::ARRAY.len() + /* slack */ 30) * 4 - 1;
-		let mut url_buf = [0u8; URL_BUF_CAPACITY];
+		let mut url_buf = [0u8; crate::url::capacity::URL_CAPACITY_LATEST];
 		let mut writer = &mut url_buf[..];
 		let token = builder.token;
 		builder.write_url(&mut writer).expect("failed to construct /latest request URL");
@@ -157,4 +153,13 @@ impl Request {
 			rate_limit,
 		})
 	}
+}
+
+/// [`latest` endpoint](Request) response data.
+#[derive(Debug)]
+pub struct Metadata<DateTime, RateLimit = RateLimitIgnore> {
+	/// Datetime to let you know then this dataset was last updated. ― [Latest endpoint docs](https://currencyapi.com/docs/latest#:~:text=datetime%20to%20let%20you%20know%20then%20this%20dataset%20was%20last%20updated).
+	pub last_updated_at: DateTime,
+	/// Rate-limit data.
+	pub rate_limit: RateLimit,
 }
