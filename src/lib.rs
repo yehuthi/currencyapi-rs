@@ -1,4 +1,27 @@
 //! [currencyapi](https://currencyapi.com/) API library.
+//!
+//! > **Note:** experimental
+//!
+//! The starting point of this library is the [`Rates`] type for currency rates,  which provides:
+//! - [x] [Latest Exchange Rates](https://currencyapi.com/docs/latest) - [`Rates::fetch_latest`]
+//! - [ ] [Historical Exchange Rates](https://currencyapi.com/docs/historical)
+//!
+//! The [Convert Exchange Rates](https://currencyapi.com/docs/convert) endpoint is not provided but
+//! conversion is implemented via [`Rates::convert`].
+//!
+//! ## Example
+//! ```ignore
+//! async fn main() {
+//!   let mut rates = Rates::<rust_decimal::Decimal>::new(); // requires `rust_decimal` feature and crate
+//!   let request = request.base_currency(EUR).currencies([EUR,USD,GBP]).build();
+//!   let metadata = rates
+//!   	.fetch_latest::<DateTime<Utc>, RateLimitIgnore>(&client, request) // DateTime<Utc> from the `chrono` crate
+//!   	.await
+//!   	.unwrap();
+//!   println!("Fetched {} rates as of {}", rates.len(), metadata.last_updated_at);
+//!   for (currency, value) in rates.iter() { println!("{currency} {value}"); }
+//! }
+//! ```
 
 #![deny(missing_docs)]
 
