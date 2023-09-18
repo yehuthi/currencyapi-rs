@@ -5,6 +5,8 @@ use std::{
 	num::NonZeroU8, str::FromStr, mem, ptr, hash::Hash,
 };
 
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 const CURRENCY_LEN_MIN: usize = 2;
 const CURRENCY_LEN_MAX: usize = 5;
 
@@ -141,6 +143,32 @@ impl AsRef<str> for CurrencyCode {
 
 impl Display for CurrencyCode {
 	#[inline] fn fmt(&self, f: &mut Formatter) -> fmt::Result { Display::fmt(AsRef::<str>::as_ref(&self), f) }
+}
+
+impl Serialize for CurrencyCode {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+		<Self as AsRef<str>>::as_ref(&self).serialize(serializer)
+	}
+}
+
+impl<'de> Deserialize<'de> for CurrencyCode {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+		struct Visitor;
+
+		impl<'de> serde::de::Visitor<'de> for Visitor {
+			type Value = CurrencyCode;
+
+			fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+				formatter.write_str("a currency code")
+			}
+
+			fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: serde::de::Error {
+				v.parse().map_err(serde::de::Error::custom)
+			}
+		}
+
+		deserializer.deserialize_str(Visitor)
+	}
 }
 
 /// Invalid currency code error.
@@ -288,5 +316,15 @@ mod tests {
 			Err(Error::TooLong) => {},
 			_ => panic!(),
 		}
+	}
+
+	#[test]
+	fn test_serde() {
+		let value = crate::currency::USD;
+		let json = "\"USD\"";
+		let serialized = serde_json::to_string::<CurrencyCode>(&value).unwrap();
+		let deserialized = serde_json::from_str::<CurrencyCode>(json).unwrap();
+		assert_eq!(serialized, json);
+		assert_eq!(deserialized, value);
 	}
 }
